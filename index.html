@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Baby Monitor - WebRTC LAN</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Mode Selection Screen -->
+        <div id="modeSelection">
+            <h1>👶 Baby Monitor</h1>
+            <p class="subtitle">Secure LAN Video Streaming</p>
+
+            <div class="mode-selection">
+                <button onclick="app.startCameraMode()">
+                    📹 Camera Mode
+                    <div class="button-subtitle">Place with baby</div>
+                </button>
+
+                <button onclick="app.startViewerMode()">
+                    👀 Viewer Mode
+                    <div class="button-subtitle">Watch from another device</div>
+                </button>
+            </div>
+
+            <div class="instructions">
+                <strong>How it works:</strong>
+                <ol>
+                    <li>Start Camera Mode on the device near the baby</li>
+                    <li>Start Viewer Mode on your monitoring device</li>
+                    <li>Scan the QR code shown in Camera Mode</li>
+                    <li>Enjoy secure peer-to-peer streaming</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Camera Mode Screen -->
+        <div id="cameraMode" class="hidden">
+            <h1>📹 Camera Mode</h1>
+            <div id="cameraStatus" class="status info">Initializing camera...</div>
+
+            <video id="localVideo" autoplay muted playsinline></video>
+
+            <div id="qrContainer" class="qr-container hidden">
+                <h3>Scan to connect</h3>
+                <div id="qrcode">
+                    <p style="padding: 20px; color: #666;">Generating QR code...</p>
+                </div>
+                <p class="peer-id" style="margin-top: 15px;">
+                    <strong style="font-size: 32px; color: #667eea; font-family: monospace; letter-spacing: 4px;">
+                        <span id="peerId">----</span>
+                    </strong>
+                </p>
+                <p style="font-size: 13px; color: #666; margin-top: 5px;">
+                    Enter this code on viewer device
+                </p>
+                <p style="font-size: 11px; color: #999; margin-top: 10px;">
+                    📱 Or scan QR code for instant connection
+                </p>
+            </div>
+
+            <button class="secondary" onclick="app.resetApp()">← Back to Menu</button>
+        </div>
+
+        <!-- Viewer Mode Screen -->
+        <div id="viewerMode" class="hidden">
+            <h1>👀 Viewer Mode</h1>
+            <div id="viewerStatus" class="status info">Ready to connect</div>
+
+            <!-- Manual Code Entry (Default) -->
+            <div id="manualEntryContainer">
+                <div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+                    <p style="font-size: 16px; margin-bottom: 15px;"><strong>Enter 4-digit code:</strong></p>
+                    <input type="text" id="manualPeerId" placeholder="1234" maxlength="4" pattern="[0-9]{4}"
+                           style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 28px; text-align: center; letter-spacing: 10px;">
+                    <button onclick="app.connectManually()" style="margin-top: 15px; width: 100%;">
+                        📡 Connect
+                    </button>
+                </div>
+
+                <div style="text-align: center; margin: 20px 0; color: #999;">
+                    <span style="font-size: 14px;">── OR ──</span>
+                </div>
+
+                <button onclick="app.toggleQRScanner()" style="width: 100%; background: #6c757d;">
+                    📷 Scan QR Code
+                </button>
+            </div>
+
+            <!-- QR Scanner (Hidden by default) -->
+            <div id="scannerContainer" class="hidden">
+                <video id="qrScanner" playsinline></video>
+                <p class="scanner-instruction">Point your camera at the QR code</p>
+                <button onclick="app.toggleQRScanner()" class="secondary" style="margin-top: 15px;">
+                    ⌨️ Enter Code Instead
+                </button>
+            </div>
+
+            <!-- Remote Video -->
+            <div id="remoteVideoContainer" class="hidden">
+                <video id="remoteVideo" autoplay playsinline controls muted></video>
+                <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                    If video is black, check camera permissions on the camera device.
+                    <button onclick="document.getElementById('remoteVideo').play()"
+                            style="padding: 5px 10px; font-size: 12px; margin-left: 10px;">
+                        ▶ Play
+                    </button>
+                </p>
+            </div>
+
+            <button class="secondary" onclick="app.resetApp()">← Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- External Libraries -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+
+    <!-- Main Application -->
+    <script src="app.js"></script>
+</body>
+</html>
