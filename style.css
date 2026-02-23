@@ -1,0 +1,276 @@
+/* ========================================
+   BABY MONITOR - STYLES
+   ======================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    color: #333;
+}
+
+.container {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 100%;
+    padding: 30px;
+    text-align: center;
+}
+
+/* ========================================
+   TYPOGRAPHY
+   ======================================== */
+
+h1 {
+    color: #667eea;
+    margin-bottom: 10px;
+    font-size: 28px;
+}
+
+.subtitle {
+    color: #666;
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+/* ========================================
+   BUTTONS
+   ======================================== */
+
+button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 20px 40px;
+    font-size: 18px;
+    font-weight: 600;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    touch-action: manipulation;
+    width: 100%;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button.secondary {
+    background: #6c757d;
+    font-size: 14px;
+    padding: 12px 24px;
+    margin-top: 15px;
+}
+
+.button-subtitle {
+    font-size: 12px;
+    font-weight: normal;
+    margin-top: 5px;
+}
+
+/* ========================================
+   MODE SELECTION
+   ======================================== */
+
+.mode-selection {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.instructions {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.instructions ol {
+    margin-left: 20px;
+    margin-top: 10px;
+}
+
+.instructions li {
+    margin: 5px 0;
+}
+
+/* ========================================
+   VIDEO ELEMENTS
+   ======================================== */
+
+video {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 12px;
+    background: #000;
+    margin: 20px 0;
+}
+
+#localVideo {
+    max-height: 300px;
+    object-fit: cover;
+}
+
+#remoteVideo {
+    max-height: 70vh;
+    object-fit: contain;
+    background: #000;
+    min-height: 200px;
+}
+
+#remoteVideo::-webkit-media-controls-panel {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+#qrScanner {
+    width: 100%;
+    max-width: 400px;
+    height: 300px;
+    margin: 20px auto;
+    display: block;
+    background: #000;
+    border-radius: 12px;
+}
+
+#qrScanner::-webkit-media-controls {
+    display: none !important;
+}
+
+/* ========================================
+   QR CODE
+   ======================================== */
+
+.qr-container {
+    margin: 20px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+.qr-container h3 {
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: #333;
+}
+
+#qrcode {
+    display: inline-block;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+}
+
+.peer-id {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #666;
+}
+
+.peer-id span {
+    font-family: monospace;
+    background: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.scanner-instruction {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #666;
+}
+
+/* ========================================
+   STATUS MESSAGES
+   ======================================== */
+
+.status {
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    font-weight: 500;
+}
+
+.status.info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.status.success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status.warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status code {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+
+.hidden {
+    display: none !important;
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+
+@media (max-width: 480px) {
+    .container {
+        padding: 20px;
+    }
+
+    h1 {
+        font-size: 24px;
+    }
+
+    button {
+        font-size: 16px;
+        padding: 16px 32px;
+    }
+
+    #remoteVideo {
+        max-height: 60vh;
+    }
+}
+
+@media (max-height: 600px) {
+    #remoteVideo {
+        max-height: 50vh;
+    }
+}
