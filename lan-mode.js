@@ -555,14 +555,14 @@ app.scanAnswerQR = async function() {
                     const code = jsQR(imageData.data, imageData.width, imageData.height);
 
                     if (code) {
-                        console.log('✅ Answer QR code detected');
+                        console.log('✅ Answer QR code detected:', code.data.substring(0, 50) + '...');
                         clearInterval(scanInterval);
 
                         // Stop camera
                         stream.getTracks().forEach(track => track.stop());
                         scannerContainer.classList.add('hidden');
 
-                        // Process answer
+                        // Process answer automatically
                         document.getElementById('lanAnswerInput').value = code.data;
                         app.completeLANConnection();
                     }
@@ -643,14 +643,14 @@ app.startOfferQRScanner = async function() {
                     const code = jsQR(imageData.data, imageData.width, imageData.height);
 
                     if (code) {
-                        console.log('✅ Offer QR code detected');
+                        console.log('✅ Offer QR code detected:', code.data.substring(0, 50) + '...');
                         clearInterval(scanInterval);
 
                         // Stop camera
                         stream.getTracks().forEach(track => track.stop());
                         scannerContainer.classList.add('hidden');
 
-                        // Process offer
+                        // Process offer automatically
                         document.getElementById('lanOfferCode').value = code.data;
                         app.connectLANMode();
                     }
