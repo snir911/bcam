@@ -481,14 +481,35 @@ app.connectLANMode = async function() {
  * Display answer code for camera (as QR code)
  */
 app.displayLANAnswer = function(answerInfo) {
-    // Compress answer data
+    // Apply same aggressive optimization to answer
+    let sdp = answerInfo.answer.sdp
+        .replace(/\r\n/g, '\n')
+        .replace(/\n+/g, '\n')
+        .replace(/a=extmap:[^\n]+\n/g, '')
+        .replace(/a=rtcp-fb:[^\n]+\n/g, '')
+        .replace(/a=fmtp:[^\n]+\n/g, '')
+        .replace(/a=ssrc:[^\n]+\n/g, '')
+        .replace(/a=msid:[^\n]+\n/g, '')
+        .replace(/a=rtcp-mux\n/g, '')
+        .trim();
+
+    const candidates = answerInfo.candidates
+        .filter(c => c.candidate.includes('typ host'))
+        .slice(0, 2)
+        .map(c => {
+            const parts = c.candidate.split(' ');
+            return `${parts[0]} ${parts[1]} ${parts[2]} ${parts[3]} ${parts[4]} ${parts[5]} ${parts[7]} ${parts[8]}`;
+        });
+
     const compactAnswer = {
-        a: answerInfo.answer.sdp.replace(/\r\n/g, '\n').trim(),
-        c: answerInfo.candidates.map(c => c.candidate)
+        a: sdp,
+        c: candidates
     };
 
     const answerString = JSON.stringify(compactAnswer);
     const base64 = btoa(answerString);
+
+    console.log('📦 Answer data size:', base64.length, 'bytes');
 
     const answerContainer = document.getElementById('lanAnswerContainer');
     answerContainer.classList.remove('hidden');
