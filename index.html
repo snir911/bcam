@@ -11,7 +11,24 @@
         <!-- Mode Selection Screen -->
         <div id="modeSelection">
             <h1>👶 Baby Monitor</h1>
-            <p class="subtitle">Secure LAN Video Streaming</p>
+            <p class="subtitle">Secure Video Streaming</p>
+
+            <!-- Connection Mode Toggle -->
+            <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-weight: 600; font-size: 14px;">Connection Mode:</span>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <span id="modeLabel" style="font-size: 12px; color: #667eea; font-weight: 600;">INTERNET</span>
+                        <label class="mode-switch">
+                            <input type="checkbox" id="modeToggle" onchange="app.toggleConnectionMode()">
+                            <span class="mode-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <p id="modeDescription" style="font-size: 11px; color: #666; margin: 0;">
+                    Uses cloud signaling + relay servers. Works anywhere with internet.
+                </p>
+            </div>
 
             <div class="mode-selection">
                 <button onclick="app.startCameraMode()">
@@ -118,6 +135,12 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+
+    <!-- Configuration -->
+    <script src="config.js"></script>
+
+    <!-- LAN Mode (No external servers) -->
+    <script src="lan-mode.js"></script>
 
     <!-- Main Application -->
     <script src="app.js"></script>

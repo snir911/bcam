@@ -5,10 +5,12 @@ A secure, peer-to-peer baby monitor web application that works entirely in your 
 ## Features
 
 - 📹 **Camera Mode** - Place device with baby and stream video/audio
-- 👀 **Viewer Mode** - Watch from any device on your LAN
+- 👀 **Viewer Mode** - Watch from any device
+- 🌐 **Internet Mode** - Works anywhere with internet (uses PeerJS + TURN relay)
+- 🏠 **LAN Mode** - Pure local network (NO external servers!)
 - 🔒 **Peer-to-peer** - Video never goes through external servers
 - 📱 **Mobile-friendly** - Works on phones and tablets
-- 🎯 **One-file app** - Everything in a single HTML file
+- 🎯 **4-digit codes** - Easy to remember and share
 
 ## Quick Start
 

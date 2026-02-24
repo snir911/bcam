@@ -26,12 +26,14 @@
 // ========================================
 
 const app = {
-    peer: null,              // PeerJS peer instance
+    peer: null,              // PeerJS peer instance (internet mode)
+    peerConnection: null,    // RTCPeerConnection (LAN mode)
     localStream: null,       // Local media stream (camera mode)
     connection: null,        // Data connection for signaling
     call: null,              // Media call connection
     scannerStream: null,     // QR scanner video stream
     scannerInterval: null,   // QR scanner polling interval
+    isLANMode: false,        // Current connection mode
 
     // DOM element references
     elements: {
@@ -48,6 +50,62 @@ const app = {
         viewerStatus: document.getElementById('viewerStatus'),
         scannerContainer: document.getElementById('scannerContainer'),
         remoteVideoContainer: document.getElementById('remoteVideoContainer')
+    }
+};
+
+// ========================================
+// CONFIGURATION & MODE SWITCHING
+// ========================================
+
+/**
+ * Toggle between Internet and LAN connection modes
+ */
+app.toggleConnectionMode = function() {
+    const toggle = document.getElementById('modeToggle');
+    const label = document.getElementById('modeLabel');
+    const description = document.getElementById('modeDescription');
+
+    if (toggle.checked) {
+        // Switch to LAN mode
+        BabyMonitorConfig.mode = 'lan';
+        app.isLANMode = true;
+        label.textContent = 'LAN ONLY';
+        label.style.color = '#28a745';
+        description.textContent = 'Pure local network. No external servers. Manual connection.';
+    } else {
+        // Switch to Internet mode
+        BabyMonitorConfig.mode = 'internet';
+        app.isLANMode = false;
+        label.textContent = 'INTERNET';
+        label.style.color = '#667eea';
+        description.textContent = 'Uses cloud signaling + relay servers. Works anywhere with internet.';
+    }
+
+    // Save preference
+    localStorage.setItem('babymonitor_mode', BabyMonitorConfig.mode);
+    console.log('📡 Switched to', BabyMonitorConfig.mode.toUpperCase(), 'mode');
+};
+
+/**
+ * Initialize mode toggle based on saved preference
+ */
+app.initModeToggle = function() {
+    const toggle = document.getElementById('modeToggle');
+    const label = document.getElementById('modeLabel');
+    const description = document.getElementById('modeDescription');
+
+    if (BabyMonitorConfig.mode === 'lan') {
+        toggle.checked = true;
+        app.isLANMode = true;
+        label.textContent = 'LAN ONLY';
+        label.style.color = '#28a745';
+        description.textContent = 'Pure local network. No external servers. Manual connection.';
+    } else {
+        toggle.checked = false;
+        app.isLANMode = false;
+        label.textContent = 'INTERNET';
+        label.style.color = '#667eea';
+        description.textContent = 'Uses cloud signaling + relay servers. Works anywhere with internet.';
     }
 };
 
@@ -195,9 +253,36 @@ app.startCameraMode = async function() {
             };
         });
 
-        app.showStatus('cameraStatus', 'Camera started. Setting up peer connection...', 'info');
+        app.showStatus('cameraStatus', 'Camera started. Setting up connection...', 'info');
 
-        // Step 3: Initialize PeerJS with custom short ID
+        // Step 3: Check connection mode and initialize accordingly
+        if (app.isLANMode) {
+            // LAN Mode: Use manual WebRTC without PeerJS
+            await app.initLANModeCamera();
+        } else {
+            // Internet Mode: Use PeerJS
+            await app.initInternetModeCamera();
+        }
+
+    } catch (error) {
+        console.error('Camera mode error:', error);
+
+        if (error.name === 'NotAllowedError') {
+            app.showStatus('cameraStatus', 'Camera/microphone access denied. Please grant permissions and try again.', 'error');
+        } else if (error.name === 'NotFoundError') {
+            app.showStatus('cameraStatus', 'No camera/microphone found on this device.', 'error');
+        } else {
+            app.showStatus('cameraStatus', `Error: ${error.message}`, 'error');
+        }
+    }
+};
+
+/**
+ * Initialize camera mode using Internet mode (PeerJS)
+ */
+app.initInternetModeCamera = async function() {
+    try {
+        // Step 3A: Initialize PeerJS with custom short ID
         // PeerJS provides a free cloud signaling server
         // The actual video/audio data flows peer-to-peer (WebRTC), not through PeerJS servers
 
@@ -453,6 +538,15 @@ app.startViewerMode = async function(autoConnect = false) {
 
     return new Promise((resolve, reject) => {
         try {
+            // Check connection mode
+            if (app.isLANMode) {
+                // LAN Mode: Manual connection
+                app.initLANModeViewer();
+                resolve();
+                return;
+            }
+
+            // Internet Mode: PeerJS
             // Step 1: Initialize PeerJS for viewer
             app.showStatus('viewerStatus', 'Initializing connection...', 'info');
 
@@ -1020,6 +1114,9 @@ app.checkUrlParameters = function() {
 document.addEventListener('DOMContentLoaded', function() {
     app.showCompatibilityWarning();
 
+    // Initialize mode toggle
+    app.initModeToggle();
+
     // Log library loading status
     console.log('Library status:', {
         Peer: typeof Peer !== 'undefined',
@@ -1036,4 +1133,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('Baby Monitor initialized. Select a mode to begin.');
-console.log('Version: 1.0.2');
+console.log('Version: 1.1.0 - LAN/Internet mode support');
