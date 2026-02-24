@@ -215,12 +215,29 @@ app.startCameraMode = async function() {
 
         app.peer = new Peer(shortId, {
             config: {
-                // STUN servers help with NAT traversal (finding your public IP)
+                // ICE servers for NAT traversal
                 iceServers: [
+                    // STUN servers - help find your public IP (free, no relay)
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
+                    { urls: 'stun:stun1.l.google.com:19302' },
+
+                    // TURN servers - relay traffic when direct P2P fails
+                    // Using free public TURN servers (limited bandwidth, use for testing)
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                    // For production: Use your own TURN server or paid service
+                    // See: https://www.metered.ca/tools/openrelay/ (free tier available)
                 ],
-                sdpSemantics: 'unified-plan'  // Use modern WebRTC semantics
+                sdpSemantics: 'unified-plan',  // Use modern WebRTC semantics
+                iceTransportPolicy: 'all'      // Try STUN first, fall back to TURN
             }
         });
 
@@ -444,11 +461,28 @@ app.startViewerMode = async function(autoConnect = false) {
 
         app.peer = new Peer(viewerShortId, {
             config: {
+                // ICE servers for NAT traversal
                 iceServers: [
+                    // STUN servers - help find your public IP (free, no relay)
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
+                    { urls: 'stun:stun1.l.google.com:19302' },
+
+                    // TURN servers - relay traffic when direct P2P fails
+                    // Using free public TURN servers (limited bandwidth, use for testing)
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                    // For production: Use your own TURN server or paid service
                 ],
-                sdpSemantics: 'unified-plan'  // Use modern WebRTC semantics
+                sdpSemantics: 'unified-plan',  // Use modern WebRTC semantics
+                iceTransportPolicy: 'all'      // Try STUN first, fall back to TURN
             }
         });
 
@@ -741,6 +775,20 @@ app.connectToPeer = function(remotePeerId) {
             }
 
             console.log('✅ Call object created successfully, waiting for stream...');
+
+            // Log ICE connection state for debugging
+            app.call.peerConnection.oniceconnectionstatechange = () => {
+                const state = app.call.peerConnection.iceConnectionState;
+                console.log('🔌 ICE Connection State:', state);
+
+                if (state === 'connected') {
+                    console.log('✅ Direct P2P connection established');
+                } else if (state === 'completed') {
+                    console.log('✅ Connection via relay (TURN server)');
+                } else if (state === 'failed') {
+                    console.error('❌ Connection failed - check network/firewall');
+                }
+            };
 
             // When we receive the remote stream, display it
             app.call.on('stream', (remoteStream) => {
