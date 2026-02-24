@@ -4,6 +4,11 @@
  * ========================================
  */
 
+// Initialize app object early (before other modules)
+if (typeof app === 'undefined') {
+    var app = {};
+}
+
 const BabyMonitorConfig = {
     // Connection mode: 'internet' or 'lan'
     mode: 'internet',  // Default to internet mode
