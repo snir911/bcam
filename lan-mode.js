@@ -11,6 +11,11 @@
  * Uses manual SDP/ICE candidate exchange via copy/paste
  */
 
+// Ensure app object exists (in case this loads before app.js)
+if (typeof app === 'undefined') {
+    var app = {};
+}
+
 console.log('🏠 LAN Mode module loaded');
 
 /**
