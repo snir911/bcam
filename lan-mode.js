@@ -82,19 +82,37 @@ app.initLANModeCamera = async function() {
  * Compress connection data for smaller QR codes
  */
 app.compressConnectionData = function(connectionInfo) {
-    // Minimize SDP by removing unnecessary whitespace
-    const sdp = connectionInfo.offer.sdp.replace(/\r\n/g, '\n').trim();
+    let sdp = connectionInfo.offer.sdp;
 
-    // Compact candidate format - only essential fields
-    const candidates = connectionInfo.candidates.map(c => {
-        // Extract just the candidate string
-        return c.candidate;
-    });
+    // Aggressive SDP minification
+    sdp = sdp
+        .replace(/\r\n/g, '\n')           // Remove \r
+        .replace(/\n+/g, '\n')            // Multiple newlines → single
+        .replace(/a=extmap:[^\n]+\n/g, '') // Remove extension maps (not critical)
+        .replace(/a=rtcp-fb:[^\n]+\n/g, '') // Remove RTCP feedback (optional)
+        .replace(/a=fmtp:[^\n]+\n/g, '')   // Remove format parameters (use defaults)
+        .replace(/a=ssrc:[^\n]+\n/g, '')   // Remove SSRC attributes
+        .replace(/a=msid:[^\n]+\n/g, '')   // Remove media stream IDs
+        .replace(/a=rtcp-mux\n/g, '')      // Implied by modern WebRTC
+        .trim();
 
-    // Compact structure
+    // Filter candidates - only host type for LAN
+    const candidates = connectionInfo.candidates
+        .filter(c => c.candidate.includes('typ host')) // Only local IPs
+        .slice(0, 2) // Maximum 2 candidates (IPv4 + IPv6)
+        .map(c => {
+            // Extract minimal candidate info
+            const parts = c.candidate.split(' ');
+            // Keep only: foundation, component, protocol, priority, IP, port, type
+            return `${parts[0]} ${parts[1]} ${parts[2]} ${parts[3]} ${parts[4]} ${parts[5]} ${parts[7]} ${parts[8]}`;
+        });
+
+    console.log('🔧 Optimized candidates:', candidates);
+
+    // Ultra-compact structure
     const compact = {
-        o: sdp,  // offer SDP (shortened key)
-        c: candidates  // candidates (shortened key)
+        o: sdp,
+        c: candidates
     };
 
     return JSON.stringify(compact);
