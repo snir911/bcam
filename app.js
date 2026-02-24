@@ -25,7 +25,13 @@
 // GLOBAL STATE
 // ========================================
 
-const app = {
+// Initialize app object if not already created by config.js
+if (typeof app === 'undefined') {
+    var app = {};
+}
+
+// Extend app with core state
+Object.assign(app, {
     peer: null,              // PeerJS peer instance (internet mode)
     peerConnection: null,    // RTCPeerConnection (LAN mode)
     localStream: null,       // Local media stream (camera mode)
@@ -51,7 +57,7 @@ const app = {
         scannerContainer: document.getElementById('scannerContainer'),
         remoteVideoContainer: document.getElementById('remoteVideoContainer')
     }
-};
+});
 
 // ========================================
 // CONFIGURATION & MODE SWITCHING
