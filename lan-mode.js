@@ -124,17 +124,33 @@ app.compressConnectionData = function(connectionInfo) {
 app.decompressConnectionData = function(compactString) {
     const compact = JSON.parse(compactString);
 
+    // Restore full candidate format from minimal version
+    const candidates = compact.c.map(minimalCandidate => {
+        // If it's already a full candidate string, use it
+        if (minimalCandidate.startsWith('candidate:')) {
+            return {
+                candidate: minimalCandidate,
+                sdpMid: '0',
+                sdpMLineIndex: 0
+            };
+        }
+
+        // Otherwise, reconstruct from minimal format
+        // Format: "foundation component protocol priority ip port typ type"
+        return {
+            candidate: `candidate:${minimalCandidate}`,
+            sdpMid: '0',
+            sdpMLineIndex: 0
+        };
+    });
+
     // Restore full structure
     return {
         offer: {
             type: 'offer',
             sdp: compact.o
         },
-        candidates: compact.c.map(candidateStr => ({
-            candidate: candidateStr,
-            sdpMid: '0',
-            sdpMLineIndex: 0
-        }))
+        candidates: candidates
     };
 };
 
