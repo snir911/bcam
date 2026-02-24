@@ -79,10 +79,53 @@ app.initLANModeCamera = async function() {
 };
 
 /**
+ * Compress connection data for smaller QR codes
+ */
+app.compressConnectionData = function(connectionInfo) {
+    // Minimize SDP by removing unnecessary whitespace
+    const sdp = connectionInfo.offer.sdp.replace(/\r\n/g, '\n').trim();
+
+    // Compact candidate format - only essential fields
+    const candidates = connectionInfo.candidates.map(c => {
+        // Extract just the candidate string
+        return c.candidate;
+    });
+
+    // Compact structure
+    const compact = {
+        o: sdp,  // offer SDP (shortened key)
+        c: candidates  // candidates (shortened key)
+    };
+
+    return JSON.stringify(compact);
+};
+
+/**
+ * Decompress connection data
+ */
+app.decompressConnectionData = function(compactString) {
+    const compact = JSON.parse(compactString);
+
+    // Restore full structure
+    return {
+        offer: {
+            type: 'offer',
+            sdp: compact.o
+        },
+        candidates: compact.c.map(candidateStr => ({
+            candidate: candidateStr,
+            sdpMid: '0',
+            sdpMLineIndex: 0
+        }))
+    };
+};
+
+/**
  * Display connection info for viewer to copy
  */
 app.displayLANConnectionInfo = function(connectionInfo) {
-    const connectionString = JSON.stringify(connectionInfo);
+    // Compress data
+    const connectionString = app.compressConnectionData(connectionInfo);
     const base64 = btoa(connectionString);  // Encode to base64 for easier sharing
 
     // Generate short code (first 8 chars of hash)
@@ -91,28 +134,72 @@ app.displayLANConnectionInfo = function(connectionInfo) {
     app.elements.peerId.textContent = hash;
     app.elements.qrContainer.classList.remove('hidden');
 
-    // Generate QR code with connection data
-    try {
-        app.elements.qrcode.innerHTML = '';
+    // Check QR code data size
+    const dataSize = base64.length;
+    console.log(`📊 Connection data size: ${dataSize} bytes`);
 
-        // Create QR code with base64 connection data
-        new QRCode(app.elements.qrcode, {
-            text: base64,
-            width: 250,
-            height: 250,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.L  // Low correction for large data
-        });
+    // QR code capacity: ~2953 bytes for Low error correction
+    const QR_MAX_SIZE = 2900;
 
-        console.log('✅ Connection QR code generated');
-    } catch (err) {
-        console.error('QR generation failed:', err);
-        // Fallback to text
+    app.elements.qrcode.innerHTML = '';
+
+    if (dataSize > QR_MAX_SIZE) {
+        console.warn(`⚠️ Data too large for QR code (${dataSize} > ${QR_MAX_SIZE})`);
+
+        // Show copy/paste interface with helpful message
         app.elements.qrcode.innerHTML = `
-            <textarea readonly style="width: 100%; height: 120px; font-family: monospace; font-size: 10px;">${base64}</textarea>
-            <button onclick="app.copyLANCode()">📋 Copy Code</button>
+            <div style="padding: 20px; background: #fff3cd; border-radius: 8px; text-align: left;">
+                <p style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #856404;">
+                    ⚠️ Connection data too large for QR code (${(dataSize/1024).toFixed(1)} KB)
+                </p>
+                <p style="font-size: 12px; color: #856404; margin-bottom: 10px;">
+                    Use copy/paste instead:
+                </p>
+                <textarea readonly id="lanConnectionCode"
+                          style="width: 100%; height: 100px; font-family: monospace; font-size: 9px;
+                                 padding: 8px; border: 2px solid #856404; border-radius: 6px; resize: vertical;"
+                >${base64}</textarea>
+                <button onclick="app.copyLANCode()"
+                        style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white;
+                               border: none; border-radius: 6px; cursor: pointer; width: 100%;">
+                    📋 Copy Connection Code
+                </button>
+                <p style="font-size: 11px; color: #856404; margin-top: 10px;">
+                    💡 Tip: Paste in viewer's "Enter manually" field
+                </p>
+            </div>
         `;
+    } else {
+        // Data fits in QR code
+        try {
+            new QRCode(app.elements.qrcode, {
+                text: base64,
+                width: 250,
+                height: 250,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.L  // Low correction for large data
+            });
+
+            console.log(`✅ Connection QR code generated (${dataSize} bytes)`);
+        } catch (err) {
+            console.error('❌ QR generation failed:', err);
+            // Fallback to copy/paste
+            app.elements.qrcode.innerHTML = `
+                <div style="padding: 15px; background: #f8d7da; border-radius: 8px;">
+                    <p style="color: #721c24; font-size: 14px; margin-bottom: 10px;">
+                        ❌ QR code generation failed: ${err.message}
+                    </p>
+                    <textarea readonly id="lanConnectionCode"
+                              style="width: 100%; height: 100px; font-family: monospace; font-size: 10px;
+                                     padding: 10px; border: 2px solid #ddd; border-radius: 6px;"
+                    >${base64}</textarea>
+                    <button onclick="app.copyLANCode()" style="margin-top: 10px; width: 100%;">
+                        📋 Copy Code
+                    </button>
+                </div>
+            `;
+        }
     }
 
     // Add container for answer (will use QR scanner or manual)
@@ -186,7 +273,20 @@ app.completeLANConnection = async function() {
     try {
         app.showStatus('cameraStatus', 'Completing connection...', 'info');
 
-        const data = JSON.parse(atob(answerCode));
+        const compact = JSON.parse(atob(answerCode));
+
+        // Decompress answer
+        const data = {
+            answer: {
+                type: 'answer',
+                sdp: compact.a
+            },
+            candidates: compact.c.map(candidateStr => ({
+                candidate: candidateStr,
+                sdpMid: '0',
+                sdpMLineIndex: 0
+            }))
+        };
 
         // Set remote description
         await app.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
@@ -266,8 +366,8 @@ app.connectLANMode = async function() {
     try {
         app.showStatus('viewerStatus', 'Connecting...', 'info');
 
-        // Decode connection info
-        const connectionInfo = JSON.parse(atob(offerCode));
+        // Decode and decompress connection info
+        const connectionInfo = app.decompressConnectionData(atob(offerCode));
 
         // Create peer connection (no ICE servers = LAN only)
         app.peerConnection = new RTCPeerConnection({ iceServers: [] });
@@ -333,7 +433,13 @@ app.connectLANMode = async function() {
  * Display answer code for camera (as QR code)
  */
 app.displayLANAnswer = function(answerInfo) {
-    const answerString = JSON.stringify(answerInfo);
+    // Compress answer data
+    const compactAnswer = {
+        a: answerInfo.answer.sdp.replace(/\r\n/g, '\n').trim(),
+        c: answerInfo.candidates.map(c => c.candidate)
+    };
+
+    const answerString = JSON.stringify(compactAnswer);
     const base64 = btoa(answerString);
 
     const answerContainer = document.getElementById('lanAnswerContainer');
