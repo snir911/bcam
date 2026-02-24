@@ -277,8 +277,8 @@ app.startCameraMode = async function() {
 
         // Step 3: Check connection mode and initialize accordingly
         if (app.isLANMode) {
-            // LAN Mode: Use manual WebRTC without PeerJS
-            await app.initLANModeCamera();
+            // LAN Mode: Use browser-based signaling (BroadcastChannel + localStorage)
+            await app.initLANModeCamera_Browser();
         } else {
             // Internet Mode: Use PeerJS
             await app.initInternetModeCamera();
@@ -560,8 +560,9 @@ app.startViewerMode = async function(autoConnect = false) {
         try {
             // Check connection mode
             if (app.isLANMode) {
-                // LAN Mode: Manual connection
-                app.initLANModeViewer();
+                // LAN Mode: Browser-based signaling
+                // Note: Room ID will be provided via URL parameter
+                app.showStatus('viewerStatus', 'LAN mode ready', 'success');
                 resolve();
                 return;
             }
@@ -1110,7 +1111,9 @@ app.checkUrlParameters = function() {
     const urlParams = new URLSearchParams(window.location.search);
     const mode = urlParams.get('mode');
     const peerId = urlParams.get('peer');
+    const roomId = urlParams.get('room');
 
+    // Internet mode auto-connect
     if (mode === 'viewer' && peerId) {
         console.log('🔗 Auto-starting viewer mode from URL');
         console.log('Target peer ID:', peerId);
@@ -1123,6 +1126,25 @@ app.checkUrlParameters = function() {
                 app.connectToPeer(peerId);
             }, 1000);
         });
+
+        return true;
+    }
+
+    // LAN mode auto-connect
+    if (mode === 'lan-viewer' && roomId) {
+        console.log('🏠 Auto-starting LAN viewer mode from URL');
+        console.log('Room ID:', roomId);
+
+        // Switch to LAN mode
+        BabyMonitorConfig.mode = 'lan';
+        app.isLANMode = true;
+
+        // Hide mode selection and show viewer mode
+        app.elements.modeSelection.classList.add('hidden');
+        app.elements.viewerMode.classList.remove('hidden');
+
+        // Auto-connect to room
+        app.initLANModeViewer_Browser(roomId);
 
         return true;
     }
