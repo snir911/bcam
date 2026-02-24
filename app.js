@@ -152,6 +152,20 @@ app.resetApp = function() {
     // Stop QR scanner
     app.stopQRScanner();
 
+    // Stop LAN mode scanners if active
+    if (typeof app.stopAnswerScanner === 'function') {
+        app.stopAnswerScanner();
+    }
+    if (typeof app.stopOfferScanner === 'function') {
+        app.stopOfferScanner();
+    }
+
+    // Close peer connection if in LAN mode
+    if (app.peerConnection) {
+        app.peerConnection.close();
+        app.peerConnection = null;
+    }
+
     // Close call
     if (app.call) {
         app.call.close();

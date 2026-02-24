@@ -91,37 +91,58 @@ app.displayLANConnectionInfo = function(connectionInfo) {
     app.elements.peerId.textContent = hash;
     app.elements.qrContainer.classList.remove('hidden');
 
-    // Show copy-paste interface
-    app.elements.qrcode.innerHTML = `
-        <div style="padding: 20px; background: white; border-radius: 8px; text-align: left;">
-            <p style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #333;">
-                📋 Step 1: Share this code with viewer:
-            </p>
-            <textarea readonly id="lanConnectionCode"
-                      style="width: 100%; height: 120px; font-family: monospace; font-size: 10px;
-                             padding: 10px; border: 2px solid #ddd; border-radius: 6px; resize: none;"
-            >${base64}</textarea>
-            <button onclick="app.copyLANCode()"
-                    style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white;
-                           border: none; border-radius: 6px; cursor: pointer; width: 100%;">
-                📋 Copy Code
-            </button>
-        </div>
+    // Generate QR code with connection data
+    try {
+        app.elements.qrcode.innerHTML = '';
 
-        <div style="padding: 20px; background: #fff3cd; border-radius: 8px; text-align: left; margin-top: 15px;">
-            <p style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #333;">
-                📥 Step 2: Paste viewer's answer code:
-            </p>
-            <textarea id="lanAnswerInput" placeholder="Paste answer code from viewer here..."
-                      style="width: 100%; height: 100px; font-family: monospace; font-size: 10px;
-                             padding: 10px; border: 2px solid #ddd; border-radius: 6px; resize: vertical;"></textarea>
-            <button onclick="app.completeLANConnection()"
-                    style="margin-top: 10px; padding: 10px 20px; background: #28a745; color: white;
-                           border: none; border-radius: 6px; cursor: pointer; width: 100%;">
-                ✅ Complete Connection
+        // Create QR code with base64 connection data
+        new QRCode(app.elements.qrcode, {
+            text: base64,
+            width: 250,
+            height: 250,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.L  // Low correction for large data
+        });
+
+        console.log('✅ Connection QR code generated');
+    } catch (err) {
+        console.error('QR generation failed:', err);
+        // Fallback to text
+        app.elements.qrcode.innerHTML = `
+            <textarea readonly style="width: 100%; height: 120px; font-family: monospace; font-size: 10px;">${base64}</textarea>
+            <button onclick="app.copyLANCode()">📋 Copy Code</button>
+        `;
+    }
+
+    // Add container for answer (will use QR scanner or manual)
+    const answerContainer = document.createElement('div');
+    answerContainer.id = 'lanAnswerSection';
+    answerContainer.style.cssText = 'margin-top: 20px; padding: 20px; background: #fff3cd; border-radius: 12px;';
+    answerContainer.innerHTML = `
+        <p style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #333;">
+            📥 Step 2: Get viewer's answer
+        </p>
+        <button onclick="app.scanAnswerQR()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-bottom: 10px;">
+            📷 Scan Answer QR Code
+        </button>
+        <div style="text-align: center; margin: 10px 0; color: #999; font-size: 12px;">── OR ──</div>
+        <textarea id="lanAnswerInput" placeholder="Paste answer code here..."
+                  style="width: 100%; height: 80px; font-family: monospace; font-size: 10px;
+                         padding: 10px; border: 2px solid #ddd; border-radius: 6px; resize: vertical;"></textarea>
+        <button onclick="app.completeLANConnection()" style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; width: 100%;">
+            ✅ Complete Connection
+        </button>
+
+        <div id="answerScannerContainer" class="hidden" style="margin-top: 15px;">
+            <video id="lanAnswerScanner" playsinline style="width: 100%; max-width: 300px; height: 300px; background: #000; border-radius: 8px;"></video>
+            <button onclick="app.stopAnswerScanner()" style="margin-top: 10px; padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                ⌨️ Enter Manually Instead
             </button>
         </div>
     `;
+
+    app.elements.qrContainer.appendChild(answerContainer);
 
     app.showStatus('cameraStatus', '⏳ Waiting for viewer answer...', 'warning');
 
@@ -192,33 +213,37 @@ app.initLANModeViewer = async function() {
 
     app.showStatus('viewerStatus', 'Ready for LAN connection', 'success');
 
-    // Show LAN connection interface instead of QR scanner/manual peer ID
+    // Show LAN connection interface with QR scanning option
     document.getElementById('manualEntryContainer').innerHTML = `
         <div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 12px;">
-            <p style="font-size: 16px; margin-bottom: 15px;"><strong>📋 Paste Camera Connection Code:</strong></p>
-            <textarea id="lanOfferCode" placeholder="Paste connection code from camera here..."
-                      style="width: 100%; height: 120px; font-family: monospace; font-size: 10px;
+            <p style="font-size: 16px; margin-bottom: 15px;"><strong>📷 Step 1: Connect to Camera</strong></p>
+
+            <button onclick="app.startOfferQRScanner()" style="width: 100%; padding: 15px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-bottom: 10px;">
+                📷 Scan Camera's QR Code
+            </button>
+
+            <div style="text-align: center; margin: 10px 0; color: #999; font-size: 12px;">── OR ──</div>
+
+            <textarea id="lanOfferCode" placeholder="Paste connection code here..."
+                      style="width: 100%; height: 100px; font-family: monospace; font-size: 10px;
                              padding: 10px; border: 2px solid #ddd; border-radius: 6px; resize: vertical;"></textarea>
-            <button onclick="app.connectLANMode()" style="margin-top: 15px; width: 100%;">
+            <button onclick="app.connectLANMode()" style="margin-top: 10px; width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer;">
                 🔗 Connect to Camera
             </button>
-            <p style="font-size: 11px; color: #666; margin-top: 10px;">
-                Copy the connection code from the camera device and paste it above
-            </p>
+
+            <div id="offerScannerContainer" class="hidden" style="margin-top: 15px;">
+                <video id="lanOfferScanner" playsinline style="width: 100%; max-width: 300px; height: 300px; background: #000; border-radius: 8px;"></video>
+                <p style="font-size: 12px; color: #666; margin-top: 5px;">Point at camera's QR code</p>
+                <button onclick="app.stopOfferScanner()" style="margin-top: 10px; padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                    ⌨️ Enter Manually Instead
+                </button>
+            </div>
         </div>
 
         <div id="lanAnswerContainer" class="hidden" style="margin: 20px 0; padding: 20px; background: #e8f5e9; border-radius: 12px;">
-            <p style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #333;">
-                📤 Send this code back to camera:
+            <p style="font-size: 16px; font-weight: 600; margin-bottom: 10px; color: #333;">
+                📤 Step 2: Show this to camera
             </p>
-            <textarea readonly id="lanAnswerCode"
-                      style="width: 100%; height: 100px; font-family: monospace; font-size: 10px;
-                             padding: 10px; border: 2px solid #4caf50; border-radius: 6px; resize: none;"></textarea>
-            <button onclick="app.copyAnswerCode()"
-                    style="margin-top: 10px; padding: 10px 20px; background: #4caf50; color: white;
-                           border: none; border-radius: 6px; cursor: pointer; width: 100%;">
-                📋 Copy Answer Code
-            </button>
         </div>
     `;
 
@@ -305,16 +330,66 @@ app.connectLANMode = async function() {
 };
 
 /**
- * Display answer code for camera
+ * Display answer code for camera (as QR code)
  */
 app.displayLANAnswer = function(answerInfo) {
     const answerString = JSON.stringify(answerInfo);
     const base64 = btoa(answerString);
 
-    document.getElementById('lanAnswerCode').value = base64;
-    document.getElementById('lanAnswerContainer').classList.remove('hidden');
+    const answerContainer = document.getElementById('lanAnswerContainer');
+    answerContainer.classList.remove('hidden');
 
-    app.showStatus('viewerStatus', '📋 Copy answer code and paste on camera device', 'warning');
+    // Generate QR code for answer
+    try {
+        const qrDiv = document.createElement('div');
+        qrDiv.id = 'answerQRCode';
+        qrDiv.style.cssText = 'text-align: center; padding: 15px; background: white; border-radius: 8px;';
+
+        new QRCode(qrDiv, {
+            text: base64,
+            width: 200,
+            height: 200,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.L
+        });
+
+        answerContainer.innerHTML = '';
+        answerContainer.appendChild(qrDiv);
+
+        const instructions = document.createElement('p');
+        instructions.style.cssText = 'font-size: 12px; color: #333; margin-top: 10px;';
+        instructions.innerHTML = `
+            <strong>📷 Camera device: Scan this QR code</strong><br>
+            (or copy code below to paste manually)
+        `;
+        answerContainer.appendChild(instructions);
+
+        // Add manual copy option
+        const manualDiv = document.createElement('div');
+        manualDiv.style.cssText = 'margin-top: 10px;';
+        manualDiv.innerHTML = `
+            <textarea readonly id="lanAnswerCode"
+                      style="width: 100%; height: 60px; font-family: monospace; font-size: 9px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;"
+            >${base64}</textarea>
+            <button onclick="app.copyAnswerCode()"
+                    style="margin-top: 5px; padding: 8px 16px; background: #4caf50; color: white; border: none; border-radius: 6px; cursor: pointer; width: 100%;">
+                📋 Copy Code
+            </button>
+        `;
+        answerContainer.appendChild(manualDiv);
+
+        console.log('✅ Answer QR code generated');
+    } catch (err) {
+        console.error('Answer QR generation failed:', err);
+        // Fallback to text only
+        answerContainer.innerHTML = `
+            <textarea readonly id="lanAnswerCode">${base64}</textarea>
+            <button onclick="app.copyAnswerCode()">📋 Copy Answer Code</button>
+        `;
+    }
+
+    app.showStatus('viewerStatus', '📱 Show QR code to camera device', 'success');
 };
 
 /**
@@ -329,6 +404,183 @@ app.copyAnswerCode = function() {
     button.textContent = '✅ Copied!';
 
     setTimeout(() => {
-        button.textContent = '📋 Copy Answer Code';
+        button.textContent = '📋 Copy Code';
     }, 2000);
+};
+
+/**
+ * Scan answer QR code (on camera device)
+ */
+app.scanAnswerQR = async function() {
+    console.log('Starting answer QR scanner...');
+
+    const scannerContainer = document.getElementById('answerScannerContainer');
+    scannerContainer.classList.remove('hidden');
+
+    try {
+        // Request camera access
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        }).catch(() => {
+            // Fallback without facingMode
+            return navigator.mediaDevices.getUserMedia({ video: true });
+        });
+
+        const video = document.getElementById('lanAnswerScanner');
+        video.srcObject = stream;
+
+        video.onloadedmetadata = () => {
+            video.play();
+        };
+
+        // Create canvas for QR detection
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        // Scan for QR code
+        const scanInterval = setInterval(() => {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                if (canvas.width > 0 && canvas.height > 0) {
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                    if (code) {
+                        console.log('✅ Answer QR code detected');
+                        clearInterval(scanInterval);
+
+                        // Stop camera
+                        stream.getTracks().forEach(track => track.stop());
+                        scannerContainer.classList.add('hidden');
+
+                        // Process answer
+                        document.getElementById('lanAnswerInput').value = code.data;
+                        app.completeLANConnection();
+                    }
+                }
+            }
+        }, 100);
+
+        // Store interval for cleanup
+        app.lanAnswerScanInterval = scanInterval;
+        app.lanAnswerScanStream = stream;
+
+    } catch (error) {
+        console.error('Answer scanner error:', error);
+        app.showStatus('cameraStatus', 'Failed to start scanner: ' + error.message, 'error');
+        scannerContainer.classList.add('hidden');
+    }
+};
+
+/**
+ * Stop answer QR scanner
+ */
+app.stopAnswerScanner = function() {
+    if (app.lanAnswerScanInterval) {
+        clearInterval(app.lanAnswerScanInterval);
+        app.lanAnswerScanInterval = null;
+    }
+
+    if (app.lanAnswerScanStream) {
+        app.lanAnswerScanStream.getTracks().forEach(track => track.stop());
+        app.lanAnswerScanStream = null;
+    }
+
+    const video = document.getElementById('lanAnswerScanner');
+    if (video) {
+        video.srcObject = null;
+    }
+
+    document.getElementById('answerScannerContainer').classList.add('hidden');
+};
+
+/**
+ * Start QR scanner for camera's offer (on viewer device)
+ */
+app.startOfferQRScanner = async function() {
+    console.log('Starting offer QR scanner...');
+
+    const scannerContainer = document.getElementById('offerScannerContainer');
+    scannerContainer.classList.remove('hidden');
+
+    try {
+        // Request camera access
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        }).catch(() => {
+            return navigator.mediaDevices.getUserMedia({ video: true });
+        });
+
+        const video = document.getElementById('lanOfferScanner');
+        video.srcObject = stream;
+
+        video.onloadedmetadata = () => {
+            video.play();
+        };
+
+        // Create canvas for QR detection
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        // Scan for QR code
+        const scanInterval = setInterval(() => {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                if (canvas.width > 0 && canvas.height > 0) {
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                    if (code) {
+                        console.log('✅ Offer QR code detected');
+                        clearInterval(scanInterval);
+
+                        // Stop camera
+                        stream.getTracks().forEach(track => track.stop());
+                        scannerContainer.classList.add('hidden');
+
+                        // Process offer
+                        document.getElementById('lanOfferCode').value = code.data;
+                        app.connectLANMode();
+                    }
+                }
+            }
+        }, 100);
+
+        // Store interval for cleanup
+        app.lanOfferScanInterval = scanInterval;
+        app.lanOfferScanStream = stream;
+
+    } catch (error) {
+        console.error('Offer scanner error:', error);
+        app.showStatus('viewerStatus', 'Failed to start scanner: ' + error.message, 'error');
+        scannerContainer.classList.add('hidden');
+    }
+};
+
+/**
+ * Stop offer QR scanner
+ */
+app.stopOfferScanner = function() {
+    if (app.lanOfferScanInterval) {
+        clearInterval(app.lanOfferScanInterval);
+        app.lanOfferScanInterval = null;
+    }
+
+    if (app.lanOfferScanStream) {
+        app.lanOfferScanStream.getTracks().forEach(track => track.stop());
+        app.lanOfferScanStream = null;
+    }
+
+    const video = document.getElementById('lanOfferScanner');
+    if (video) {
+        video.srcObject = null;
+    }
+
+    document.getElementById('offerScannerContainer').classList.add('hidden');
 };
