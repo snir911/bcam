@@ -124,9 +124,23 @@ app.decompressConnectionData = function(compactString) {
  * Display connection info for viewer to copy
  */
 app.displayLANConnectionInfo = function(connectionInfo) {
+    // Debug: Log what we have
+    console.log('📦 Raw connection info:', {
+        sdpLength: connectionInfo.offer.sdp.length,
+        candidatesCount: connectionInfo.candidates.length,
+        candidates: connectionInfo.candidates
+    });
+
     // Compress data
     const connectionString = app.compressConnectionData(connectionInfo);
     const base64 = btoa(connectionString);  // Encode to base64 for easier sharing
+
+    console.log('📦 After compression:', {
+        originalSize: JSON.stringify(connectionInfo).length,
+        compressedSize: connectionString.length,
+        base64Size: base64.length,
+        savings: `${(100 - (connectionString.length / JSON.stringify(connectionInfo).length * 100)).toFixed(1)}%`
+    });
 
     // Generate short code (first 8 chars of hash)
     const hash = base64.substring(0, 8).toUpperCase();
