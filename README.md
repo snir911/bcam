@@ -75,10 +75,28 @@ google-chrome baby-monitor.html
 
 ## Network Requirements
 
-- Both devices must be connected to the same LAN (Wi-Fi or Ethernet)
+### Works Over Internet! 🌍
+
+This baby monitor **works across the internet**, not just on LAN!
+
+- ✅ **Camera in one location** (home)
+- ✅ **Viewer anywhere** (work, coffee shop, mobile data)
+- ✅ **Direct P2P connection** when possible
+- ✅ **TURN relay fallback** for difficult networks
+
+### Requirements:
+
+- Both devices need internet connection
+- Modern browser (Chrome, Firefox, Safari, Edge)
 - No special router configuration needed
 - No port forwarding required
-- Firewall should allow WebRTC (usually enabled by default)
+
+### How It Works:
+
+1. **Direct P2P** (best): Camera ↔️ Viewer (low latency)
+2. **TURN Relay** (fallback): Camera → Relay → Viewer (if firewall blocks P2P)
+
+The app automatically tries direct connection first, then falls back to relay if needed.
 
 ## Troubleshooting
 
