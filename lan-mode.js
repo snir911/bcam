@@ -11,6 +11,8 @@
  * Uses manual SDP/ICE candidate exchange via copy/paste
  */
 
+console.log('🏠 LAN Mode module loaded');
+
 /**
  * Initialize camera in LAN mode
  * Creates WebRTC offer that viewer can paste to connect
