@@ -16,30 +16,25 @@
  * - Test on actual devices, not just emulators
  *
  * ⚠️ NETWORK REQUIREMENTS:
- * - Both devices must be on the same LAN for optimal performance
- * - ICE/STUN servers help with NAT traversal
- * - No media data goes through external servers (peer-to-peer only)
+ * - Works anywhere: same LAN, different networks, across internet
+ * - WebRTC automatically prefers local network (LAN) for lowest latency
+ * - ICE/STUN servers help with NAT traversal for internet connections
+ * - No media data goes through external servers (peer-to-peer only, may use TURN relay if needed)
  */
 
 // ========================================
 // GLOBAL STATE
 // ========================================
 
-// Initialize app object if not already created by config.js
-if (typeof app === 'undefined') {
-    var app = {};
-}
-
-// Extend app with core state
-Object.assign(app, {
-    peer: null,              // PeerJS peer instance (internet mode)
-    peerConnection: null,    // RTCPeerConnection (LAN mode)
+const app = {
+    peer: null,              // PeerJS peer instance
     localStream: null,       // Local media stream (camera mode)
     connection: null,        // Data connection for signaling
     call: null,              // Media call connection
     scannerStream: null,     // QR scanner video stream
     scannerInterval: null,   // QR scanner polling interval
-    isLANMode: false,        // Current connection mode
+    availableCameras: [],    // List of available video devices
+    currentCameraIndex: -1,  // Currently selected camera index (-1 = use facingMode)
 
     // DOM element references
     elements: {
@@ -57,62 +52,6 @@ Object.assign(app, {
         scannerContainer: document.getElementById('scannerContainer'),
         remoteVideoContainer: document.getElementById('remoteVideoContainer')
     }
-});
-
-// ========================================
-// CONFIGURATION & MODE SWITCHING
-// ========================================
-
-/**
- * Toggle between Internet and LAN connection modes
- */
-app.toggleConnectionMode = function() {
-    const toggle = document.getElementById('modeToggle');
-    const label = document.getElementById('modeLabel');
-    const description = document.getElementById('modeDescription');
-
-    if (toggle.checked) {
-        // Switch to LAN mode
-        BabyMonitorConfig.mode = 'lan';
-        app.isLANMode = true;
-        label.textContent = 'LAN ONLY';
-        label.style.color = '#28a745';
-        description.textContent = 'Pure local network. No external servers. Manual connection.';
-    } else {
-        // Switch to Internet mode
-        BabyMonitorConfig.mode = 'internet';
-        app.isLANMode = false;
-        label.textContent = 'INTERNET';
-        label.style.color = '#667eea';
-        description.textContent = 'Uses cloud signaling + relay servers. Works anywhere with internet.';
-    }
-
-    // Save preference
-    localStorage.setItem('babymonitor_mode', BabyMonitorConfig.mode);
-    console.log('📡 Switched to', BabyMonitorConfig.mode.toUpperCase(), 'mode');
-};
-
-/**
- * Initialize mode toggle based on saved preference
- */
-app.initModeToggle = function() {
-    const toggle = document.getElementById('modeToggle');
-    const label = document.getElementById('modeLabel');
-    const description = document.getElementById('modeDescription');
-
-    if (BabyMonitorConfig.mode === 'lan') {
-        toggle.checked = true;
-        app.isLANMode = true;
-        label.textContent = 'LAN ONLY';
-        label.style.color = '#28a745';
-        description.textContent = 'Pure local network. No external servers. Manual connection.';
-    } else {
-        toggle.checked = false;
-        app.isLANMode = false;
-        label.textContent = 'INTERNET';
-        label.style.color = '#667eea';
-        description.textContent = 'Uses cloud signaling + relay servers. Works anywhere with internet.';
-    }
 };
 
 // ========================================
@@ -129,6 +68,291 @@ app.showStatus = function(elementId, message, type = 'info') {
     const element = document.getElementById(elementId);
     element.textContent = message;
     element.className = `status ${type}`;
+};
+
+/**
+ * Enumerate available cameras
+ */
+app.enumerateCameras = async function() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        app.availableCameras = devices.filter(device => device.kind === 'videoinput');
+
+        console.log(`📷 Found ${app.availableCameras.length} camera(s):`,
+            app.availableCameras.map(c => c.label || c.deviceId.substring(0, 8)));
+
+        // Try to find back camera and set as default
+        const backCameraIndex = app.availableCameras.findIndex(camera =>
+            camera.label.toLowerCase().includes('back') ||
+            camera.label.toLowerCase().includes('rear') ||
+            camera.label.toLowerCase().includes('environment')
+        );
+
+        if (backCameraIndex >= 0) {
+            app.currentCameraIndex = backCameraIndex;
+            console.log('📷 Using back camera as default');
+        } else {
+            app.currentCameraIndex = -1; // Use facingMode instead
+            console.log('📷 Using facingMode: environment');
+        }
+    } catch (err) {
+        console.warn('Could not enumerate cameras:', err);
+        app.availableCameras = [];
+        app.currentCameraIndex = -1;
+    }
+};
+
+/**
+ * Get camera stream based on current selection
+ */
+app.getCamera = async function() {
+    const constraints = {
+        audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+        }
+    };
+
+    // If specific camera selected, use deviceId
+    if (app.currentCameraIndex >= 0 && app.availableCameras[app.currentCameraIndex]) {
+        constraints.video = {
+            deviceId: { exact: app.availableCameras[app.currentCameraIndex].deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        };
+        console.log('📷 Using camera:', app.availableCameras[app.currentCameraIndex].label);
+    } else {
+        // Otherwise use facingMode (back camera preferred)
+        constraints.video = {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        };
+        console.log('📷 Using facingMode: environment');
+    }
+
+    return await navigator.mediaDevices.getUserMedia(constraints);
+};
+
+/**
+ * Get scanner camera stream
+ */
+app.getScannerCamera = async function() {
+    const constraints = { video: true };
+
+    // If specific camera selected, use deviceId
+    if (app.currentCameraIndex >= 0 && app.availableCameras[app.currentCameraIndex]) {
+        constraints.video = {
+            deviceId: { exact: app.availableCameras[app.currentCameraIndex].deviceId }
+        };
+        console.log('📷 Scanner using camera:', app.availableCameras[app.currentCameraIndex].label);
+    } else {
+        // Otherwise use facingMode (back camera preferred for scanning)
+        constraints.video = { facingMode: 'environment' };
+        console.log('📷 Scanner using facingMode: environment');
+    }
+
+    return await navigator.mediaDevices.getUserMedia(constraints);
+};
+
+/**
+ * Switch to next available camera
+ */
+app.switchCamera = async function() {
+    if (app.availableCameras.length <= 1) {
+        console.log('Only one camera available, nothing to switch');
+        return;
+    }
+
+    try {
+        app.showStatus('cameraStatus', 'Switching camera...', 'info');
+
+        // Stop current stream
+        if (app.localStream) {
+            app.localStream.getTracks().forEach(track => track.stop());
+        }
+
+        // Move to next camera
+        if (app.currentCameraIndex < 0) {
+            // Was using facingMode, switch to first device
+            app.currentCameraIndex = 0;
+        } else {
+            app.currentCameraIndex = (app.currentCameraIndex + 1) % app.availableCameras.length;
+        }
+
+        // Get new camera stream
+        app.localStream = await app.getCamera();
+
+        // Update video element
+        app.elements.localVideo.srcObject = app.localStream;
+
+        // Update peer connection if active
+        if (app.peerConnection) {
+            const videoTrack = app.localStream.getVideoTracks()[0];
+            const sender = app.peerConnection.getSenders().find(s => s.track?.kind === 'video');
+            if (sender) {
+                await sender.replaceTrack(videoTrack);
+                console.log('📷 Updated video track in peer connection');
+            }
+        }
+
+        // Update call if active (PeerJS)
+        if (app.call && app.call.peerConnection) {
+            const videoTrack = app.localStream.getVideoTracks()[0];
+            const sender = app.call.peerConnection.getSenders().find(s => s.track?.kind === 'video');
+            if (sender) {
+                await sender.replaceTrack(videoTrack);
+                console.log('📷 Updated video track in active call');
+            }
+        }
+
+        const cameraName = app.availableCameras[app.currentCameraIndex]?.label || 'Camera';
+        app.showStatus('cameraStatus', `Switched to: ${cameraName}`, 'success');
+
+        // Auto-clear status after 2 seconds
+        setTimeout(() => {
+            if (app.call || app.peerConnection) {
+                app.showStatus('cameraStatus', 'Connected to viewer! Streaming...', 'success');
+            } else {
+                app.showStatus('cameraStatus', 'Waiting for viewer to connect...', 'warning');
+            }
+        }, 2000);
+
+    } catch (error) {
+        console.error('Camera switch error:', error);
+        app.showStatus('cameraStatus', `Failed to switch camera: ${error.message}`, 'error');
+    }
+};
+
+/**
+ * Switch scanner camera to next available
+ */
+app.switchScannerCamera = async function() {
+    if (app.availableCameras.length <= 1) {
+        console.log('Only one camera available, nothing to switch');
+        return;
+    }
+
+    try {
+        app.showStatus('viewerStatus', 'Switching camera...', 'info');
+
+        // Stop current scanner stream
+        if (app.scannerStream) {
+            app.scannerStream.getTracks().forEach(track => track.stop());
+        }
+
+        // Move to next camera
+        if (app.currentCameraIndex < 0) {
+            app.currentCameraIndex = 0;
+        } else {
+            app.currentCameraIndex = (app.currentCameraIndex + 1) % app.availableCameras.length;
+        }
+
+        // Get new scanner stream
+        app.scannerStream = await app.getScannerCamera();
+
+        // Update video element
+        app.elements.qrScanner.srcObject = app.scannerStream;
+
+        const cameraName = app.availableCameras[app.currentCameraIndex]?.label || 'Camera';
+        app.showStatus('viewerStatus', `Switched to: ${cameraName}`, 'success');
+
+        // Auto-clear status after 2 seconds
+        setTimeout(() => {
+            app.showStatus('viewerStatus', 'Point camera at QR code', 'success');
+        }, 2000);
+
+    } catch (error) {
+        console.error('Scanner camera switch error:', error);
+        app.showStatus('viewerStatus', `Failed to switch camera: ${error.message}`, 'error');
+    }
+};
+
+/**
+ * Detect connection type (LAN vs Internet)
+ */
+app.detectConnectionType = async function() {
+    try {
+        const pc = app.call?.peerConnection;
+        if (!pc) {
+            console.log('No peer connection to check');
+            return;
+        }
+
+        const stats = await pc.getStats();
+        let selectedPair = null;
+        let localCandidate = null;
+        let remoteCandidate = null;
+
+        // Find the selected candidate pair
+        stats.forEach(report => {
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                selectedPair = report;
+            }
+        });
+
+        if (!selectedPair) {
+            console.log('No successful candidate pair found yet');
+            return;
+        }
+
+        // Get local and remote candidates
+        stats.forEach(report => {
+            if (report.type === 'local-candidate' && report.id === selectedPair.localCandidateId) {
+                localCandidate = report;
+            }
+            if (report.type === 'remote-candidate' && report.id === selectedPair.remoteCandidateId) {
+                remoteCandidate = report;
+            }
+        });
+
+        console.log('📊 Connection Stats:', {
+            localCandidate: localCandidate?.candidateType,
+            remoteCandidate: remoteCandidate?.candidateType,
+            localAddress: localCandidate?.address,
+            remoteAddress: remoteCandidate?.address,
+            protocol: localCandidate?.protocol
+        });
+
+        // Determine connection type
+        let connectionType = 'Unknown';
+        let connectionIcon = '🔗';
+        let connectionColor = '#667eea';
+
+        if (localCandidate && remoteCandidate) {
+            // Both are host candidates = direct LAN connection
+            if (localCandidate.candidateType === 'host' && remoteCandidate.candidateType === 'host') {
+                connectionType = 'LAN (Direct Local Network)';
+                connectionIcon = '🏠';
+                connectionColor = '#28a745';
+            }
+            // Either is relay = using TURN server
+            else if (localCandidate.candidateType === 'relay' || remoteCandidate.candidateType === 'relay') {
+                connectionType = 'Internet (Relay Server)';
+                connectionIcon = '🌐';
+                connectionColor = '#ffc107';
+            }
+            // Server reflexive = direct internet (through NAT)
+            else if (localCandidate.candidateType === 'srflx' || remoteCandidate.candidateType === 'srflx') {
+                connectionType = 'Internet (Direct P2P)';
+                connectionIcon = '🌐';
+                connectionColor = '#17a2b8';
+            }
+        }
+
+        // Display connection type
+        const connectionTypeElement = document.getElementById('connectionType');
+        if (connectionTypeElement) {
+            connectionTypeElement.innerHTML = `${connectionIcon} Connected via <strong>${connectionType}</strong>`;
+            connectionTypeElement.style.color = connectionColor;
+        }
+
+        console.log(`✅ Connection Type: ${connectionType}`);
+
+    } catch (error) {
+        console.error('Error detecting connection type:', error);
+    }
 };
 
 /**
@@ -152,20 +376,6 @@ app.resetApp = function() {
     // Stop QR scanner
     app.stopQRScanner();
 
-    // Stop LAN mode scanners if active
-    if (typeof app.stopAnswerScanner === 'function') {
-        app.stopAnswerScanner();
-    }
-    if (typeof app.stopOfferScanner === 'function') {
-        app.stopOfferScanner();
-    }
-
-    // Close peer connection if in LAN mode
-    if (app.peerConnection) {
-        app.peerConnection.close();
-        app.peerConnection = null;
-    }
-
     // Close call
     if (app.call) {
         app.call.close();
@@ -181,6 +391,12 @@ app.resetApp = function() {
     app.elements.scannerContainer.classList.add('hidden');  // Hide scanner
     app.elements.qrcode.innerHTML = '';
 
+    // Hide camera switch button
+    const switchBtn = document.getElementById('switchCameraBtn');
+    if (switchBtn) {
+        switchBtn.style.display = 'none';
+    }
+
     // Reset viewer mode to manual entry state
     const manualContainer = document.getElementById('manualEntryContainer');
     if (manualContainer) {
@@ -191,6 +407,13 @@ app.resetApp = function() {
     const manualInput = document.getElementById('manualPeerId');
     if (manualInput) {
         manualInput.value = '';
+    }
+
+    // Reset connection type display
+    const connectionTypeElement = document.getElementById('connectionType');
+    if (connectionTypeElement) {
+        connectionTypeElement.innerHTML = '🔗 Detecting connection type...';
+        connectionTypeElement.style.color = '#667eea';
     }
 };
 
@@ -215,24 +438,23 @@ app.startCameraMode = async function() {
             throw new Error('getUserMedia is not supported in this browser or context. Please use HTTPS or localhost.');
         }
 
-        // Step 1: Request camera and microphone access
+        // Step 1: Enumerate available cameras
+        await app.enumerateCameras();
+
+        // Step 2: Request camera and microphone access
         app.showStatus('cameraStatus', 'Requesting camera and microphone access...', 'info');
 
-        app.localStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: 'user',  // Front camera (can change to 'environment' for back)
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            },
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            }
-        });
+        app.localStream = await app.getCamera();
 
         // Step 2: Display local video feed
         app.elements.localVideo.srcObject = app.localStream;
+
+        // Show camera switch button if multiple cameras available
+        const switchBtn = document.getElementById('switchCameraBtn');
+        if (switchBtn && app.availableCameras.length > 1) {
+            switchBtn.style.display = 'block';
+            console.log(`📷 Camera switcher enabled (${app.availableCameras.length} cameras available)`);
+        }
 
         // Log stream info for debugging
         console.log('✅ Local stream created successfully');
@@ -273,36 +495,9 @@ app.startCameraMode = async function() {
             };
         });
 
-        app.showStatus('cameraStatus', 'Camera started. Setting up connection...', 'info');
+        app.showStatus('cameraStatus', 'Camera started. Setting up peer connection...', 'info');
 
-        // Step 3: Check connection mode and initialize accordingly
-        if (app.isLANMode) {
-            // LAN Mode: Use browser-based signaling (BroadcastChannel + localStorage)
-            await app.initLANModeCamera_Browser();
-        } else {
-            // Internet Mode: Use PeerJS
-            await app.initInternetModeCamera();
-        }
-
-    } catch (error) {
-        console.error('Camera mode error:', error);
-
-        if (error.name === 'NotAllowedError') {
-            app.showStatus('cameraStatus', 'Camera/microphone access denied. Please grant permissions and try again.', 'error');
-        } else if (error.name === 'NotFoundError') {
-            app.showStatus('cameraStatus', 'No camera/microphone found on this device.', 'error');
-        } else {
-            app.showStatus('cameraStatus', `Error: ${error.message}`, 'error');
-        }
-    }
-};
-
-/**
- * Initialize camera mode using Internet mode (PeerJS)
- */
-app.initInternetModeCamera = async function() {
-    try {
-        // Step 3A: Initialize PeerJS with custom short ID
+        // Step 3: Initialize PeerJS with custom short ID
         // PeerJS provides a free cloud signaling server
         // The actual video/audio data flows peer-to-peer (WebRTC), not through PeerJS servers
 
@@ -313,8 +508,8 @@ app.initInternetModeCamera = async function() {
 
         console.log('Initializing PeerJS...');
 
-        // Generate a random 4-digit number for peer ID
-        const shortId = Math.floor(1000 + Math.random() * 9000).toString(); // 1000-9999
+        // Generate a random 6-digit number for peer ID
+        const shortId = Math.floor(100000 + Math.random() * 900000).toString(); // 100000-999999
 
         console.log('Attempting to create peer with ID:', shortId);
 
@@ -558,21 +753,11 @@ app.startViewerMode = async function(autoConnect = false) {
 
     return new Promise((resolve, reject) => {
         try {
-            // Check connection mode
-            if (app.isLANMode) {
-                // LAN Mode: Browser-based signaling
-                // Note: Room ID will be provided via URL parameter
-                app.showStatus('viewerStatus', 'LAN mode ready', 'success');
-                resolve();
-                return;
-            }
-
-            // Internet Mode: PeerJS
             // Step 1: Initialize PeerJS for viewer
             app.showStatus('viewerStatus', 'Initializing connection...', 'info');
 
-        // Generate a random 4-digit ID for viewer too (not critical, but keeps it consistent)
-        const viewerShortId = Math.floor(1000 + Math.random() * 9000).toString();
+        // Generate a random 6-digit ID for viewer too (not critical, but keeps it consistent)
+        const viewerShortId = Math.floor(100000 + Math.random() * 900000).toString();
 
         app.peer = new Peer(viewerShortId, {
             config: {
@@ -648,18 +833,19 @@ app.startQRScanner = async function() {
             throw new Error('getUserMedia is not supported in this browser or context. Please use HTTPS or localhost.');
         }
 
+        // Enumerate cameras if not already done
+        if (app.availableCameras.length === 0) {
+            await app.enumerateCameras();
+        }
+
         app.showStatus('viewerStatus', 'Requesting camera access...', 'info');
 
         // Request camera access for QR scanning
         try {
-            app.scannerStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: 'environment'  // Back camera preferred for scanning
-                }
-            });
+            app.scannerStream = await app.getScannerCamera();
         } catch (err) {
             console.error('Camera access error:', err);
-            // Try without facingMode constraint (some devices don't support it)
+            // Fallback to simple video constraint
             app.scannerStream = await navigator.mediaDevices.getUserMedia({
                 video: true
             });
@@ -667,6 +853,13 @@ app.startQRScanner = async function() {
 
         console.log('Camera access granted, starting video...');
         app.elements.qrScanner.srcObject = app.scannerStream;
+
+        // Show camera switch button if multiple cameras available
+        const switchBtn = document.getElementById('switchScannerCameraBtn');
+        if (switchBtn && app.availableCameras.length > 1) {
+            switchBtn.style.display = 'block';
+            console.log(`📷 Scanner camera switcher enabled (${app.availableCameras.length} cameras available)`);
+        }
 
         // Wait for video to be ready
         app.elements.qrScanner.onloadedmetadata = () => {
@@ -781,6 +974,12 @@ app.stopQRScanner = function() {
         scannerVideo.srcObject = null;
     }
 
+    // Hide scanner camera switch button
+    const switchBtn = document.getElementById('switchScannerCameraBtn');
+    if (switchBtn) {
+        switchBtn.style.display = 'none';
+    }
+
     console.log('QR scanner stopped');
 };
 
@@ -792,12 +991,12 @@ app.connectManually = function() {
     const peerId = input.value.trim();
 
     if (!peerId) {
-        app.showStatus('viewerStatus', 'Please enter a 4-digit code', 'error');
+        app.showStatus('viewerStatus', 'Please enter a 6-digit code', 'error');
         return;
     }
 
-    if (peerId.length !== 4 || !/^\d{4}$/.test(peerId)) {
-        app.showStatus('viewerStatus', 'Code must be 4 digits (0-9)', 'error');
+    if (peerId.length !== 6 || !/^\d{6}$/.test(peerId)) {
+        app.showStatus('viewerStatus', 'Code must be 6 digits (0-9)', 'error');
         return;
     }
 
@@ -985,6 +1184,11 @@ app.connectToPeer = function(remotePeerId) {
             // Show video and update status
             app.elements.remoteVideoContainer.classList.remove('hidden');
             app.showStatus('viewerStatus', 'Connected! Receiving live feed', 'success');
+
+            // Detect and display connection type (LAN vs Internet)
+            setTimeout(() => {
+                app.detectConnectionType();
+            }, 2000);  // Wait 2 seconds for ICE to settle
         });
 
             // Handle call errors
@@ -1111,9 +1315,7 @@ app.checkUrlParameters = function() {
     const urlParams = new URLSearchParams(window.location.search);
     const mode = urlParams.get('mode');
     const peerId = urlParams.get('peer');
-    const roomId = urlParams.get('room');
 
-    // Internet mode auto-connect
     if (mode === 'viewer' && peerId) {
         console.log('🔗 Auto-starting viewer mode from URL');
         console.log('Target peer ID:', peerId);
@@ -1130,34 +1332,12 @@ app.checkUrlParameters = function() {
         return true;
     }
 
-    // LAN mode auto-connect
-    if (mode === 'lan-viewer' && roomId) {
-        console.log('🏠 Auto-starting LAN viewer mode from URL');
-        console.log('Room ID:', roomId);
-
-        // Switch to LAN mode
-        BabyMonitorConfig.mode = 'lan';
-        app.isLANMode = true;
-
-        // Hide mode selection and show viewer mode
-        app.elements.modeSelection.classList.add('hidden');
-        app.elements.viewerMode.classList.remove('hidden');
-
-        // Auto-connect to room
-        app.initLANModeViewer_Browser(roomId);
-
-        return true;
-    }
-
     return false;
 };
 
 // Run compatibility check and auto-mode on load
 document.addEventListener('DOMContentLoaded', function() {
     app.showCompatibilityWarning();
-
-    // Initialize mode toggle
-    app.initModeToggle();
 
     // Log library loading status
     console.log('Library status:', {
@@ -1175,4 +1355,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('Baby Monitor initialized. Select a mode to begin.');
-console.log('Version: 1.1.0 - LAN/Internet mode support');
+console.log('Version: 1.3.0 - Connection type detection, camera switcher & 6-digit codes');
