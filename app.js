@@ -16,10 +16,10 @@
  * - Test on actual devices, not just emulators
  *
  * ⚠️ NETWORK REQUIREMENTS:
- * - Works anywhere: same LAN, different networks, across internet
+ * - Works on same LAN or with direct internet P2P connection
  * - WebRTC automatically prefers local network (LAN) for lowest latency
- * - ICE/STUN servers help with NAT traversal for internet connections
- * - No media data goes through external servers (peer-to-peer only, may use TURN relay if needed)
+ * - STUN server helps with NAT traversal
+ * - TURN relay available as fallback for restricted networks
  */
 
 // ========================================
@@ -165,12 +165,27 @@ app.switchCamera = async function() {
         return;
     }
 
+    // Prevent multiple simultaneous switches
+    const switchBtn = document.getElementById('switchCameraBtn');
+    if (switchBtn && switchBtn.disabled) {
+        console.log('Camera switch already in progress');
+        return;
+    }
+
     try {
+        // Disable button during switch
+        if (switchBtn) switchBtn.disabled = true;
+
         app.showStatus('cameraStatus', 'Switching camera...', 'info');
 
         // Stop current stream
         if (app.localStream) {
-            app.localStream.getTracks().forEach(track => track.stop());
+            app.localStream.getTracks().forEach(track => {
+                track.stop();
+                console.log('Stopped track:', track.kind);
+            });
+            // Small delay to ensure tracks are fully released
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
 
         // Move to next camera
@@ -183,27 +198,45 @@ app.switchCamera = async function() {
 
         // Get new camera stream
         app.localStream = await app.getCamera();
+        console.log('✅ New camera stream acquired');
 
         // Update video element
         app.elements.localVideo.srcObject = app.localStream;
 
+        // Wait a bit for the video element to start playing
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         // Update peer connection if active
         if (app.peerConnection) {
             const videoTrack = app.localStream.getVideoTracks()[0];
-            const sender = app.peerConnection.getSenders().find(s => s.track?.kind === 'video');
-            if (sender) {
-                await sender.replaceTrack(videoTrack);
+            const audioTrack = app.localStream.getAudioTracks()[0];
+            const videoSender = app.peerConnection.getSenders().find(s => s.track?.kind === 'video');
+            const audioSender = app.peerConnection.getSenders().find(s => s.track?.kind === 'audio');
+
+            if (videoSender && videoTrack) {
+                await videoSender.replaceTrack(videoTrack);
                 console.log('📷 Updated video track in peer connection');
+            }
+            if (audioSender && audioTrack) {
+                await audioSender.replaceTrack(audioTrack);
+                console.log('🎤 Updated audio track in peer connection');
             }
         }
 
         // Update call if active (PeerJS)
         if (app.call && app.call.peerConnection) {
             const videoTrack = app.localStream.getVideoTracks()[0];
-            const sender = app.call.peerConnection.getSenders().find(s => s.track?.kind === 'video');
-            if (sender) {
-                await sender.replaceTrack(videoTrack);
+            const audioTrack = app.localStream.getAudioTracks()[0];
+            const videoSender = app.call.peerConnection.getSenders().find(s => s.track?.kind === 'video');
+            const audioSender = app.call.peerConnection.getSenders().find(s => s.track?.kind === 'audio');
+
+            if (videoSender && videoTrack) {
+                await videoSender.replaceTrack(videoTrack);
                 console.log('📷 Updated video track in active call');
+            }
+            if (audioSender && audioTrack) {
+                await audioSender.replaceTrack(audioTrack);
+                console.log('🎤 Updated audio track in active call');
             }
         }
 
@@ -222,6 +255,18 @@ app.switchCamera = async function() {
     } catch (error) {
         console.error('Camera switch error:', error);
         app.showStatus('cameraStatus', `Failed to switch camera: ${error.message}`, 'error');
+
+        // Try to recover by getting a fresh stream
+        try {
+            console.log('Attempting recovery...');
+            app.localStream = await app.getCamera();
+            app.elements.localVideo.srcObject = app.localStream;
+        } catch (recoveryError) {
+            console.error('Recovery failed:', recoveryError);
+        }
+    } finally {
+        // Re-enable button
+        if (switchBtn) switchBtn.disabled = false;
     }
 };
 
@@ -285,15 +330,25 @@ app.detectConnectionType = async function() {
         let localCandidate = null;
         let remoteCandidate = null;
 
-        // Find the selected candidate pair
+        // Log all candidate pairs for debugging
+        const allPairs = [];
         stats.forEach(report => {
-            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-                selectedPair = report;
+            if (report.type === 'candidate-pair') {
+                allPairs.push({
+                    state: report.state,
+                    localId: report.localCandidateId,
+                    remoteId: report.remoteCandidateId
+                });
+                if (report.state === 'succeeded') {
+                    selectedPair = report;
+                }
             }
         });
 
+        console.log('📊 All candidate pairs:', allPairs);
+
         if (!selectedPair) {
-            console.log('No successful candidate pair found yet');
+            console.warn('⚠️ No successful candidate pair found yet');
             return;
         }
 
@@ -515,29 +570,15 @@ app.startCameraMode = async function() {
 
         app.peer = new Peer(shortId, {
             config: {
-                // ICE servers for NAT traversal
                 iceServers: [
-                    // STUN servers - help find your public IP (free, no relay)
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-
-                    // TURN servers - relay traffic when direct P2P fails
-                    // Using free public TURN servers (limited bandwidth, use for testing)
-                    {
-                        urls: 'turn:openrelay.metered.ca:80',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
                     {
                         urls: 'turn:openrelay.metered.ca:443',
                         username: 'openrelayproject',
                         credential: 'openrelayproject'
                     }
-                    // For production: Use your own TURN server or paid service
-                    // See: https://www.metered.ca/tools/openrelay/ (free tier available)
                 ],
-                sdpSemantics: 'unified-plan',  // Use modern WebRTC semantics
-                iceTransportPolicy: 'all'      // Try STUN first, fall back to TURN
+                sdpSemantics: 'unified-plan'
             }
         });
 
@@ -761,28 +802,15 @@ app.startViewerMode = async function(autoConnect = false) {
 
         app.peer = new Peer(viewerShortId, {
             config: {
-                // ICE servers for NAT traversal
                 iceServers: [
-                    // STUN servers - help find your public IP (free, no relay)
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-
-                    // TURN servers - relay traffic when direct P2P fails
-                    // Using free public TURN servers (limited bandwidth, use for testing)
-                    {
-                        urls: 'turn:openrelay.metered.ca:80',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
                     {
                         urls: 'turn:openrelay.metered.ca:443',
                         username: 'openrelayproject',
                         credential: 'openrelayproject'
                     }
-                    // For production: Use your own TURN server or paid service
                 ],
-                sdpSemantics: 'unified-plan',  // Use modern WebRTC semantics
-                iceTransportPolicy: 'all'      // Try STUN first, fall back to TURN
+                sdpSemantics: 'unified-plan'
             }
         });
 
@@ -1090,6 +1118,38 @@ app.connectToPeer = function(remotePeerId) {
 
             console.log('✅ Call object created successfully, waiting for stream...');
 
+            // Set timeout for stream reception (30 seconds)
+            const streamTimeout = setTimeout(() => {
+                if (app.call && !app.elements.remoteVideo.srcObject) {
+                    console.error('❌ Stream timeout - no video received after 30 seconds');
+                    app.showStatus('viewerStatus', 'Connection timeout. Camera may be offline or behind firewall.', 'error');
+                    if (app.call) {
+                        app.call.close();
+                        app.call = null;
+                    }
+                    // Show manual entry again for retry
+                    document.getElementById('manualEntryContainer').classList.remove('hidden');
+                }
+            }, 30000);
+
+            // Store timeout for cleanup
+            app.streamTimeout = streamTimeout;
+
+            // Log ICE candidates for debugging
+            app.call.peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log('📍 ICE Candidate:', {
+                        type: event.candidate.type || 'unknown',
+                        protocol: event.candidate.protocol,
+                        address: event.candidate.address || event.candidate.ip || 'N/A',
+                        port: event.candidate.port,
+                        candidate: event.candidate.candidate
+                    });
+                } else {
+                    console.log('✅ ICE gathering complete');
+                }
+            };
+
             // Log ICE connection state for debugging
             app.call.peerConnection.oniceconnectionstatechange = () => {
                 const state = app.call.peerConnection.iceConnectionState;
@@ -1099,14 +1159,34 @@ app.connectToPeer = function(remotePeerId) {
                     console.log('✅ Direct P2P connection established');
                 } else if (state === 'completed') {
                     console.log('✅ Connection via relay (TURN server)');
+                } else if (state === 'disconnected') {
+                    console.warn('⚠️ ICE connection disconnected - may recover automatically');
+                    app.showStatus('viewerStatus', 'Connection interrupted, attempting to reconnect...', 'warning');
                 } else if (state === 'failed') {
                     console.error('❌ Connection failed - check network/firewall');
+                    clearTimeout(streamTimeout);
+                    app.showStatus('viewerStatus', 'Connection failed. Check network/firewall settings.', 'error');
+                    // Show manual entry again for retry
+                    document.getElementById('manualEntryContainer').classList.remove('hidden');
                 }
             };
 
             // When we receive the remote stream, display it
             app.call.on('stream', (remoteStream) => {
             console.log('✅ Received remote stream from camera');
+
+            // Skip if this is the same stream we already have
+            if (app.elements.remoteVideo.srcObject && app.elements.remoteVideo.srcObject.id === remoteStream.id) {
+                console.log('ℹ️ Stream already set, skipping duplicate update');
+                return;
+            }
+
+            // Clear timeout - stream received successfully
+            if (app.streamTimeout) {
+                clearTimeout(app.streamTimeout);
+                app.streamTimeout = null;
+            }
+
             console.log('Stream ID:', remoteStream.id);
             console.log('Stream active:', remoteStream.active);
             console.log('All tracks:', remoteStream.getTracks().map(t => ({
@@ -1149,21 +1229,27 @@ app.connectToPeer = function(remotePeerId) {
                 videoTracks[0].enabled = true;
             }
 
-            // Set the stream
+            // Set the stream (this will trigger loadedmetadata/loadeddata events)
             app.elements.remoteVideo.srcObject = remoteStream;
 
-            // Add event listeners to video element for debugging
-            app.elements.remoteVideo.onloadedmetadata = () => {
-                console.log('✅ Video metadata loaded:', {
-                    duration: app.elements.remoteVideo.duration,
-                    videoWidth: app.elements.remoteVideo.videoWidth,
-                    videoHeight: app.elements.remoteVideo.videoHeight
+            // Ensure video is muted for autoplay (will be unmuted by user button)
+            app.elements.remoteVideo.muted = true;
+
+            // Use canplay event which fires when enough data is available to play
+            const playVideo = () => {
+                console.log('✅ Video can play, attempting playback...');
+
+                app.elements.remoteVideo.play().then(() => {
+                    console.log('✅ Video playback started successfully (muted)');
+                    app.showStatus('viewerStatus', 'Connected! Click "Enable Sound" button below to hear audio', 'success');
+                }).catch(err => {
+                    console.error('❌ Autoplay failed:', err);
+                    app.showStatus('viewerStatus', 'Connected! Click "Enable Sound & Play" button below', 'warning');
                 });
             };
 
-            app.elements.remoteVideo.onloadeddata = () => {
-                console.log('✅ Video data loaded');
-            };
+            // Use once to ensure this only fires one time
+            app.elements.remoteVideo.addEventListener('canplay', playVideo, { once: true });
 
             app.elements.remoteVideo.onplay = () => {
                 console.log('✅ Video playing');
@@ -1173,17 +1259,8 @@ app.connectToPeer = function(remotePeerId) {
                 console.error('❌ Video element error:', e);
             };
 
-            // Force play (in case autoplay is blocked)
-            app.elements.remoteVideo.play().then(() => {
-                console.log('✅ Video playback started successfully');
-            }).catch(err => {
-                console.error('❌ Autoplay failed:', err);
-                app.showStatus('viewerStatus', 'Connected! Click ▶ Play button below', 'warning');
-            });
-
-            // Show video and update status
+            // Show video container (status will be updated when video starts playing)
             app.elements.remoteVideoContainer.classList.remove('hidden');
-            app.showStatus('viewerStatus', 'Connected! Receiving live feed', 'success');
 
             // Detect and display connection type (LAN vs Internet)
             setTimeout(() => {
