@@ -1262,6 +1262,10 @@ app.connectToPeer = function(remotePeerId) {
             // Show video container (status will be updated when video starts playing)
             app.elements.remoteVideoContainer.classList.remove('hidden');
 
+            // Store peer ID for auto-reconnect
+            app.lastConnectedPeer = remotePeerId;
+            console.log('💾 Stored peer ID for auto-reconnect:', remotePeerId);
+
             // Detect and display connection type (LAN vs Internet)
             setTimeout(() => {
                 app.detectConnectionType();
@@ -1428,6 +1432,33 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Auto-mode activated from URL');
     } else {
         console.log('Manual mode selection required');
+    }
+});
+
+// ========================================
+// AUTO-RECONNECT ON PAGE VISIBILITY
+// ========================================
+
+// Store last connected peer for auto-reconnect
+app.lastConnectedPeer = null;
+
+// Detect when page becomes visible again (mobile returns from background)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        console.log('📱 Page became visible');
+
+        // If we're in viewer mode and had a connection that's now closed
+        if (app.mode === 'viewer' && app.lastConnectedPeer && (!app.call || app.call.connectionId === undefined)) {
+            console.log('🔄 Auto-reconnecting to:', app.lastConnectedPeer);
+            app.showStatus('viewerStatus', 'Reconnecting...', 'info');
+
+            // Wait a bit for network to stabilize
+            setTimeout(() => {
+                app.connectToPeer(app.lastConnectedPeer);
+            }, 1000);
+        }
+    } else {
+        console.log('📱 Page hidden (backgrounded)');
     }
 });
 
