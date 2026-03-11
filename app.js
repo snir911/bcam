@@ -35,6 +35,7 @@ const app = {
     scannerInterval: null,   // QR scanner polling interval
     availableCameras: [],    // List of available video devices
     currentCameraIndex: -1,  // Currently selected camera index (-1 = use facingMode)
+    wakeLock: null,          // Screen wake lock (keep camera running)
 
     // DOM element references
     elements: {
@@ -428,6 +429,9 @@ app.resetApp = function() {
         app.localStream = null;
     }
 
+    // Release wake lock
+    app.releaseWakeLock();
+
     // Stop QR scanner
     app.stopQRScanner();
 
@@ -551,6 +555,9 @@ app.startCameraMode = async function() {
         });
 
         app.showStatus('cameraStatus', 'Camera started. Setting up peer connection...', 'info');
+
+        // Request wake lock to keep screen on and prevent backgrounding
+        await app.requestWakeLock();
 
         // Step 3: Initialize PeerJS with custom short ID
         // PeerJS provides a free cloud signaling server
@@ -1436,6 +1443,46 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========================================
+// WAKE LOCK - KEEP SCREEN ON (CAMERA MODE)
+// ========================================
+
+/**
+ * Request screen wake lock to keep camera running in background
+ */
+app.requestWakeLock = async function() {
+    if ('wakeLock' in navigator) {
+        try {
+            app.wakeLock = await navigator.wakeLock.request('screen');
+            console.log('🔒 Wake Lock acquired - screen will stay on');
+
+            // Re-acquire wake lock if it's released (e.g., when screen turns off)
+            app.wakeLock.addEventListener('release', () => {
+                console.log('🔓 Wake Lock released');
+            });
+        } catch (err) {
+            console.warn('⚠️ Wake Lock failed:', err.message);
+        }
+    } else {
+        console.warn('⚠️ Wake Lock API not supported in this browser');
+    }
+};
+
+/**
+ * Release screen wake lock
+ */
+app.releaseWakeLock = async function() {
+    if (app.wakeLock) {
+        try {
+            await app.wakeLock.release();
+            app.wakeLock = null;
+            console.log('🔓 Wake Lock released manually');
+        } catch (err) {
+            console.warn('⚠️ Failed to release Wake Lock:', err);
+        }
+    }
+};
+
+// ========================================
 // AUTO-RECONNECT ON PAGE VISIBILITY
 // ========================================
 
@@ -1446,6 +1493,12 @@ app.lastConnectedPeer = null;
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
         console.log('📱 Page became visible');
+
+        // Re-acquire wake lock if in camera mode
+        if (app.mode === 'camera' && app.localStream) {
+            console.log('🔄 Re-acquiring wake lock for camera mode');
+            app.requestWakeLock();
+        }
 
         // If we're in viewer mode and had a connection that's now closed
         if (app.mode === 'viewer' && app.lastConnectedPeer && (!app.call || app.call.connectionId === undefined)) {
