@@ -1,42 +1,31 @@
-# 👶 Baby Monitor - WebRTC LAN Streaming
+# 👶 Baby Monitor - WebRTC Streaming
 
-A secure, peer-to-peer baby monitor web application that works entirely in your browser. No servers, no cloud storage, no subscription - just direct video streaming between your devices on the same network.
+A secure, peer-to-peer baby monitor web application that works entirely in your browser. No servers, no cloud storage, no subscription - just direct video streaming between your devices.
 
 ## Features
 
 - 📹 **Camera Mode** - Place device with baby and stream video/audio
-- 👀 **Viewer Mode** - Watch from any device on your LAN
-- 🔒 **Peer-to-peer** - Video never goes through external servers
+- 👀 **Viewer Mode** - Watch from any device
+- 🔒 **Peer-to-peer** - Video never goes through external servers (direct P2P or relay)
 - 📱 **Mobile-friendly** - Works on phones and tablets
-- 🎯 **One-file app** - Everything in a single HTML file
+- 🔢 **Simple codes** - Easy 6-digit connection codes
+- 🔄 **Auto-reconnect** - Viewer reconnects when returning from background
+- 🔒 **Wake Lock** - Camera stays on when screen is active
 
 ## Quick Start
 
-### Method 1: Using Python (Recommended for Testing)
+### Using the App
 
-```bash
-# Navigate to the directory containing baby-monitor.html
-cd /home/ssheribe/git/babycam
+1. **On GitHub Pages:**
+   - Visit: `https://[your-username].github.io/bcam/`
+   - Or serve locally with Python/Node.js
 
-# Start a simple HTTP server
-python3 -m http.server 8000
-
-# Or using Python 2
-python -m SimpleHTTPServer 8000
-```
-
-Then open in your browser:
-- On the same device: `http://localhost:8000/baby-monitor.html`
-- On other devices: `http://[YOUR_LOCAL_IP]:8000/baby-monitor.html`
-
-### Method 2: Direct File Access
-
-Some browsers allow direct file access for testing:
-```bash
-firefox baby-monitor.html
-# or
-google-chrome baby-monitor.html
-```
+2. **Locally with Python:**
+   ```bash
+   cd /home/ssheribe/git/babycam
+   python3 -m http.server 8000
+   ```
+   Then open `http://localhost:8000`
 
 ⚠️ **Note**: Camera access requires HTTPS in production, but `localhost` works for testing.
 
@@ -45,20 +34,21 @@ google-chrome baby-monitor.html
 ### Setting Up Camera Mode
 
 1. **On the device near the baby:**
-   - Open `baby-monitor.html`
+   - Open the app in your browser
    - Click "📹 Camera Mode"
    - Grant camera and microphone permissions
-   - A QR code will appear on screen
+   - A 6-digit code will appear on screen
    - Keep this device with the baby
 
 ### Setting Up Viewer Mode
 
 2. **On your monitoring device:**
-   - Open `baby-monitor.html`
+   - Open the app in your browser
    - Click "👀 Viewer Mode"
-   - Grant camera permission (for QR scanning)
-   - Point your camera at the QR code from step 1
-   - Video feed will start automatically
+   - Enter the 6-digit code from the camera screen
+   - Click "Connect"
+   - Video feed will start automatically (muted)
+   - Click "🔊 Enable Sound & Play" to unmute
 
 ## Browser Compatibility
 
@@ -70,23 +60,21 @@ google-chrome baby-monitor.html
 
 ✅ **Mobile:**
 - Chrome for Android 74+
-- Safari on iOS 12+
+- Safari on iOS 16.4+ (for Wake Lock API)
 - Samsung Internet 11+
 
 ## Network Requirements
 
-### Works Over Internet! 🌍
+### Works on LAN and Internet! 🌍
 
-This baby monitor **works across the internet**, not just on LAN!
-
-- ✅ **Camera in one location** (home)
-- ✅ **Viewer anywhere** (work, coffee shop, mobile data)
-- ✅ **Direct P2P connection** when possible
-- ✅ **TURN relay fallback** for difficult networks
+This baby monitor works on:
+- ✅ **Same local network (LAN)** - Lowest latency
+- ✅ **Direct internet P2P** - When NAT allows
+- ✅ **TURN relay fallback** - For restricted networks
 
 ### Requirements:
 
-- Both devices need internet connection
+- Both devices need internet connection (for signaling)
 - Modern browser (Chrome, Firefox, Safari, Edge)
 - No special router configuration needed
 - No port forwarding required
@@ -106,25 +94,25 @@ The app automatically tries direct connection first, then falls back to relay if
 - **HTTPS required**: Modern browsers require HTTPS for media access (except localhost)
 - **iOS Safari**: May need user interaction before accessing camera - click a button first
 
-### QR Scanner Not Working
-
-- **Lighting**: Ensure good lighting for QR code scanning
-- **Distance**: Hold camera 6-12 inches from QR code
-- **Focus**: Wait for camera to focus on the QR code
-- **Permissions**: Verify camera access was granted
-
 ### Connection Fails
 
-- **Same network**: Verify both devices are on the same LAN
 - **Firewall**: Check if firewall is blocking WebRTC connections
 - **Try again**: Close the app and restart both devices
 - **Browser console**: Open developer tools (F12) and check for errors
+- **TURN server**: The free TURN server may be down, try again later
 
 ### No Video/Audio
 
 - **Browser support**: Ensure you're using a compatible browser
 - **Codec support**: Some older devices may not support the same video codecs
-- **Bandwidth**: Poor Wi-Fi signal can affect streaming quality
+- **Bandwidth**: Poor network signal can affect streaming quality
+- **Autoplay**: Click "🔊 Enable Sound & Play" button to unmute
+
+### Viewer Disconnects on Mobile
+
+- **Expected behavior**: Mobile browsers suspend pages when backgrounded
+- **Auto-reconnect**: App automatically reconnects when you return to the page
+- **Keep screen on**: Don't let your phone sleep
 
 ## Technical Architecture
 
@@ -133,70 +121,69 @@ The app automatically tries direct connection first, then falls back to relay if
 The app uses WebRTC for direct browser-to-browser communication:
 
 1. **Signaling**: PeerJS provides a free cloud signaling server for initial handshake
-2. **ICE/STUN**: Google's public STUN servers help with NAT traversal
-3. **Media**: Audio/video streams directly between peers (no relay)
+2. **ICE/STUN**: Google's STUN server helps with NAT traversal
+3. **TURN**: Free TURN relay server for restricted networks
+4. **Media**: Audio/video streams directly between peers (or via relay)
 
 ### Libraries Used
 
 - **PeerJS** (v1.5.2) - Simplifies WebRTC peer connections
-- **qrcode.js** (v1.5.3) - Generates QR codes
-- **jsQR** (v1.4.0) - Scans QR codes from video stream
 
 ### Privacy & Security
 
 ✅ **No cloud storage** - Video is never saved anywhere
-✅ **Peer-to-peer** - Direct connection between your devices
+✅ **Peer-to-peer** - Direct connection between your devices (or minimal relay)
 ✅ **Temporary session** - Connection ends when you close the page
-✅ **Local network** - Works entirely on your LAN
 
-⚠️ **Security note**: This is designed for home LAN use. For production or internet-wide deployment, add encryption, authentication, and use HTTPS.
+⚠️ **Security note**: This is designed for personal use. For production deployment, consider additional encryption and authentication.
 
 ## Development Notes
 
 ### File Structure
 
 ```
-baby-monitor.html
-├── HTML structure
-├── Embedded CSS (styling)
-├── External libraries (CDN)
-│   ├── PeerJS
-│   ├── QRCode.js
-│   └── jsQR
-└── Embedded JavaScript (logic)
-    ├── Camera mode functions
-    ├── Viewer mode functions
-    ├── QR code generation/scanning
-    └── WebRTC connection handling
+bcam/
+├── index.html          # Main HTML structure
+├── app.js              # Application logic
+├── style.css           # Styling
+├── README.md          # This file
+└── start.sh           # Helper script
 ```
+
+### Key Features Implementation
+
+- **6-digit codes**: Random peer IDs (100000-999999)
+- **Wake Lock API**: Keeps camera screen on
+- **Auto-reconnect**: Detects page visibility changes
+- **Multi-camera**: Switch between front/back cameras
+- **Connection detection**: Shows LAN vs Internet connection type
 
 ### Customization
 
 You can easily customize:
 
-- **Video quality**: Modify the `getUserMedia` constraints in `startCameraMode()`
-- **UI colors**: Update the CSS gradient and color values
-- **QR code size**: Change `width` parameter in `QRCode.toCanvas()`
-- **Scanner sensitivity**: Adjust the interval in `setInterval()` for QR scanning
+- **Video quality**: Modify the `getUserMedia` constraints in `getCamera()`
+- **UI colors**: Update the CSS variables
+- **TURN server**: Change the ICE server configuration in `app.js`
 
 ### Example: Change Video Quality
 
 ```javascript
-// In startCameraMode(), find this section:
+// In getCamera(), find this section:
 video: {
-    facingMode: 'user',
-    width: { ideal: 1280 },    // Change to 640 for lower quality
-    height: { ideal: 720 }     // Change to 480 for lower quality
+    facingMode: 'environment',  // 'user' for front, 'environment' for back
+    width: { ideal: 1280 },     // Change to 640 for lower quality
+    height: { ideal: 720 }      // Change to 480 for lower quality
 }
 ```
 
 ## Limitations
 
 - **Battery drain**: Camera mode will drain battery quickly
-- **Screen must stay on**: Device may sleep if screen turns off
+- **Wake Lock**: Works in foreground only (true background requires native app)
 - **One viewer at a time**: Current implementation supports 1-to-1 connection
 - **No recording**: Video is not saved (by design)
-- **Internet required**: PeerJS signaling requires internet (but media is local)
+- **Free TURN server**: May be slow or unavailable
 
 ## Future Enhancements
 
@@ -219,7 +206,6 @@ For issues or questions:
 1. Check the browser console (F12) for error messages
 2. Verify your network setup and permissions
 3. Test with a different browser or device
-4. Ensure both devices are on the same LAN
 
 ---
 

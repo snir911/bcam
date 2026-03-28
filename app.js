@@ -700,8 +700,8 @@ app.startCameraMode = async function() {
 
 /**
  * Initialize and start viewer mode
- * This mode scans QR code and connects to camera
- * @param {boolean} autoConnect - If true, skip QR scanner
+ * This mode allows entering the 6-digit code to connect to camera
+ * @param {boolean} autoConnect - If true, auto-connect using URL parameter
  * @returns {Promise} Resolves when peer is ready
  */
 app.startViewerMode = async function(autoConnect = false) {
@@ -743,7 +743,6 @@ app.startViewerMode = async function(autoConnect = false) {
                 resolve();  // Signal that peer is ready
             } else {
                 app.showStatus('viewerStatus', 'Ready to connect', 'success');
-                // Don't auto-start QR scanner - let user choose
                 resolve();
             }
         });
@@ -789,8 +788,8 @@ app.connectManually = function() {
 };
 
 /**
- * Connect to the camera peer using the scanned peer ID
- * @param {string} remotePeerId - The peer ID from the QR code
+ * Connect to the camera peer using the entered peer ID
+ * @param {string} remotePeerId - The 6-digit peer ID from camera
  */
 app.connectToPeer = function(remotePeerId) {
     console.log('Connecting to peer:', remotePeerId);
