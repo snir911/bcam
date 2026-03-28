@@ -142,16 +142,6 @@ video {
     background: rgba(0, 0, 0, 0.5);
 }
 
-#qrScanner {
-    width: 100%;
-    max-width: 400px;
-    height: 300px;
-    margin: 20px auto;
-    display: block;
-    background: #000;
-    border-radius: 12px;
-}
-
 }
 
 /* ========================================
