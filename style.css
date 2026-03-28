@@ -219,6 +219,32 @@ button {
     font-size: 18px;
 }
 
+.share-button {
+    background: rgba(48, 84, 188, 0.1);
+    color: var(--primary);
+    padding: 14px 28px;
+    border-radius: var(--border-radius);
+    font-size: 15px;
+    font-weight: 600;
+    width: 100%;
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid rgba(48, 84, 188, 0.2);
+    transition: all 0.3s ease;
+}
+
+.share-button .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.share-button:hover {
+    background: rgba(48, 84, 188, 0.15);
+    border-color: var(--primary);
+}
+
 button.secondary {
     background: rgba(100, 116, 139, 0.1);
     color: var(--text-primary);

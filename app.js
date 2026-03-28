@@ -364,6 +364,70 @@ app.detectConnectionType = async function() {
 };
 
 /**
+ * Share or copy the viewer link with the current peer code
+ */
+app.shareViewerLink = async function() {
+    const peerId = app.elements.peerId.textContent;
+
+    if (!peerId || peerId === '------') {
+        app.showStatus('cameraStatus', 'No code available to share yet', 'warning');
+        return;
+    }
+
+    // Construct the viewer URL
+    const baseUrl = window.location.origin + window.location.pathname;
+    const viewerUrl = `${baseUrl}?mode=viewer&peer=${peerId}`;
+
+    try {
+        // Try Web Share API first (works on mobile)
+        if (navigator.share) {
+            await navigator.share({
+                title: 'Cradle Baby Monitor',
+                text: `Join my baby monitor session with code: ${peerId}`,
+                url: viewerUrl
+            });
+            console.log('✅ Shared via Web Share API');
+            app.showStatus('cameraStatus', 'Link shared successfully!', 'success');
+        } else {
+            // Fallback to clipboard
+            await navigator.clipboard.writeText(viewerUrl);
+            console.log('✅ Copied to clipboard:', viewerUrl);
+            app.showStatus('cameraStatus', 'Viewer link copied to clipboard!', 'success');
+        }
+
+        // Auto-clear success message after 3 seconds
+        setTimeout(() => {
+            app.showStatus('cameraStatus', 'Ready to stream! Show this code to viewer', 'success');
+        }, 3000);
+
+    } catch (error) {
+        console.error('❌ Share/copy failed:', error);
+
+        // Final fallback: try older clipboard method
+        try {
+            const textArea = document.createElement('textarea');
+            textArea.value = viewerUrl;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+
+            console.log('✅ Copied via fallback method');
+            app.showStatus('cameraStatus', 'Viewer link copied to clipboard!', 'success');
+
+            setTimeout(() => {
+                app.showStatus('cameraStatus', 'Ready to stream! Show this code to viewer', 'success');
+            }, 3000);
+        } catch (fallbackError) {
+            console.error('❌ Fallback copy failed:', fallbackError);
+            app.showStatus('cameraStatus', `Failed to copy: ${error.message}`, 'error');
+        }
+    }
+};
+
+/**
  * Reset the application to initial state
  */
 app.resetApp = function() {
