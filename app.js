@@ -31,8 +31,6 @@ const app = {
     localStream: null,       // Local media stream (camera mode)
     connection: null,        // Data connection for signaling
     call: null,              // Media call connection
-    scannerStream: null,     // QR scanner video stream
-    scannerInterval: null,   // QR scanner polling interval
     availableCameras: [],    // List of available video devices
     currentCameraIndex: -1,  // Currently selected camera index (-1 = use facingMode)
     wakeLock: null,          // Screen wake lock (keep camera running)
@@ -44,13 +42,10 @@ const app = {
         viewerMode: document.getElementById('viewerMode'),
         localVideo: document.getElementById('localVideo'),
         remoteVideo: document.getElementById('remoteVideo'),
-        qrScanner: document.getElementById('qrScanner'),
-        qrContainer: document.getElementById('qrContainer'),
-        qrcode: document.getElementById('qrcode'),
+        codeDisplay: document.getElementById('codeDisplay'),
         peerId: document.getElementById('peerId'),
         cameraStatus: document.getElementById('cameraStatus'),
         viewerStatus: document.getElementById('viewerStatus'),
-        scannerContainer: document.getElementById('scannerContainer'),
         remoteVideoContainer: document.getElementById('remoteVideoContainer')
     }
 };
@@ -272,50 +267,6 @@ app.switchCamera = async function() {
 };
 
 /**
- * Switch scanner camera to next available
- */
-app.switchScannerCamera = async function() {
-    if (app.availableCameras.length <= 1) {
-        console.log('Only one camera available, nothing to switch');
-        return;
-    }
-
-    try {
-        app.showStatus('viewerStatus', 'Switching camera...', 'info');
-
-        // Stop current scanner stream
-        if (app.scannerStream) {
-            app.scannerStream.getTracks().forEach(track => track.stop());
-        }
-
-        // Move to next camera
-        if (app.currentCameraIndex < 0) {
-            app.currentCameraIndex = 0;
-        } else {
-            app.currentCameraIndex = (app.currentCameraIndex + 1) % app.availableCameras.length;
-        }
-
-        // Get new scanner stream
-        app.scannerStream = await app.getScannerCamera();
-
-        // Update video element
-        app.elements.qrScanner.srcObject = app.scannerStream;
-
-        const cameraName = app.availableCameras[app.currentCameraIndex]?.label || 'Camera';
-        app.showStatus('viewerStatus', `Switched to: ${cameraName}`, 'success');
-
-        // Auto-clear status after 2 seconds
-        setTimeout(() => {
-            app.showStatus('viewerStatus', 'Point camera at QR code', 'success');
-        }, 2000);
-
-    } catch (error) {
-        console.error('Scanner camera switch error:', error);
-        app.showStatus('viewerStatus', `Failed to switch camera: ${error.message}`, 'error');
-    }
-};
-
-/**
  * Detect connection type (LAN vs Internet)
  */
 app.detectConnectionType = async function() {
@@ -432,9 +383,6 @@ app.resetApp = function() {
     // Release wake lock
     app.releaseWakeLock();
 
-    // Stop QR scanner
-    app.stopQRScanner();
-
     // Close call
     if (app.call) {
         app.call.close();
@@ -445,10 +393,10 @@ app.resetApp = function() {
     app.elements.modeSelection.classList.remove('hidden');
     app.elements.cameraMode.classList.add('hidden');
     app.elements.viewerMode.classList.add('hidden');
-    app.elements.qrContainer.classList.add('hidden');
+    if (app.elements.codeDisplay) {
+        app.elements.codeDisplay.classList.add('hidden');
+    }
     app.elements.remoteVideoContainer.classList.add('hidden');
-    app.elements.scannerContainer.classList.add('hidden');  // Hide scanner
-    app.elements.qrcode.innerHTML = '';
 
     // Hide camera switch button
     const switchBtn = document.getElementById('switchCameraBtn');
@@ -591,54 +539,18 @@ app.startCameraMode = async function() {
 
         console.log('PeerJS initialized, waiting for connection...');
 
-        // Step 4: When peer is ready, generate QR code with direct viewer URL
+        // Step 4: When peer is ready, display the 6-digit code
         app.peer.on('open', (id) => {
             console.log('Peer connection opened! Peer ID:', id);
-            app.showStatus('cameraStatus', 'Waiting for viewer to connect...', 'warning');
+            app.showStatus('cameraStatus', 'Ready to stream! Show this code to viewer', 'success');
 
             // Display peer ID
             app.elements.peerId.textContent = id;
 
-            // Show QR container first (with peer ID text)
-            app.elements.qrContainer.classList.remove('hidden');
+            // Show code display
+            app.elements.codeDisplay.classList.remove('hidden');
 
-            // Create direct viewer URL with peer ID
-            // When scanned, this will automatically open viewer mode and connect
-            const baseUrl = window.location.origin + window.location.pathname;
-            const viewerUrl = `${baseUrl}?mode=viewer&peer=${id}`;
-
-            console.log('Generating QR code for viewer URL:', viewerUrl);
-
-            // Check if QRCode library is loaded
-            if (typeof QRCode === 'undefined') {
-                console.error('QRCode library not loaded!');
-                app.showStatus('cameraStatus', 'QR library failed to load. Share URL manually: ' + viewerUrl, 'warning');
-                app.elements.qrcode.innerHTML = '<div style="padding: 20px; background: white; border-radius: 8px;"><strong style="font-size: 12px; font-family: monospace; word-break: break-all;">' + viewerUrl + '</strong></div>';
-                return;
-            }
-
-            try {
-                // Clear the loading message
-                app.elements.qrcode.innerHTML = '';
-
-                // Create QR code containing the full viewer URL
-                // Scanning this will open the page and auto-connect!
-                new QRCode(app.elements.qrcode, {
-                    text: viewerUrl,
-                    width: 250,
-                    height: 250,
-                    colorDark: '#000000',
-                    colorLight: '#ffffff',
-                    correctLevel: QRCode.CorrectLevel.M  // Medium correction for URLs
-                });
-
-                console.log('✅ QR code generated successfully with auto-connect URL');
-            } catch (err) {
-                console.error('Exception generating QR code:', err);
-                app.showStatus('cameraStatus', 'QR generation error. Use URL: ' + viewerUrl, 'warning');
-                // Fallback to displaying URL as text
-                app.elements.qrcode.innerHTML = '<div style="padding: 20px; background: white; border-radius: 8px;"><strong style="font-size: 12px; font-family: monospace; word-break: break-all;">' + viewerUrl + '</strong></div>';
-            }
+            console.log('✅ 6-digit code displayed:', id);
         });
 
         // Step 5: Handle incoming calls from viewer
@@ -856,169 +768,6 @@ app.startViewerMode = async function(autoConnect = false) {
 };
 
 /**
- * Start the QR code scanner
- * Uses the device camera to scan QR codes
- */
-app.startQRScanner = async function() {
-    try {
-        console.log('Starting QR scanner...');
-
-        // Check browser compatibility first
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('getUserMedia is not supported in this browser or context. Please use HTTPS or localhost.');
-        }
-
-        // Enumerate cameras if not already done
-        if (app.availableCameras.length === 0) {
-            await app.enumerateCameras();
-        }
-
-        app.showStatus('viewerStatus', 'Requesting camera access...', 'info');
-
-        // Request camera access for QR scanning
-        try {
-            app.scannerStream = await app.getScannerCamera();
-        } catch (err) {
-            console.error('Camera access error:', err);
-            // Fallback to simple video constraint
-            app.scannerStream = await navigator.mediaDevices.getUserMedia({
-                video: true
-            });
-        }
-
-        console.log('Camera access granted, starting video...');
-        app.elements.qrScanner.srcObject = app.scannerStream;
-
-        // Show camera switch button if multiple cameras available
-        const switchBtn = document.getElementById('switchScannerCameraBtn');
-        if (switchBtn && app.availableCameras.length > 1) {
-            switchBtn.style.display = 'block';
-            console.log(`📷 Scanner camera switcher enabled (${app.availableCameras.length} cameras available)`);
-        }
-
-        // Wait for video to be ready
-        app.elements.qrScanner.onloadedmetadata = () => {
-            console.log('QR scanner video loaded');
-            app.elements.qrScanner.play().then(() => {
-                console.log('QR scanner video playing');
-                app.showStatus('viewerStatus', 'Point camera at QR code', 'success');
-            }).catch(err => {
-                console.error('Video play error:', err);
-            });
-        };
-
-        app.showStatus('viewerStatus', 'Starting camera...', 'info');
-
-        // Create a canvas for processing video frames
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-
-        // Wait a bit for video to start, then begin scanning
-        setTimeout(() => {
-            console.log('Starting QR code detection loop...');
-
-            // Poll video frames to detect QR codes
-            // This runs continuously while scanner is active
-            app.scannerInterval = setInterval(() => {
-                if (app.elements.qrScanner.readyState === app.elements.qrScanner.HAVE_ENOUGH_DATA) {
-                    // Set canvas size to match video
-                    canvas.width = app.elements.qrScanner.videoWidth;
-                    canvas.height = app.elements.qrScanner.videoHeight;
-
-                    if (canvas.width > 0 && canvas.height > 0) {
-                        // Draw current video frame to canvas
-                        context.drawImage(app.elements.qrScanner, 0, 0, canvas.width, canvas.height);
-
-                        // Get image data and attempt to decode QR code
-                        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                        const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-                        // If QR code detected, process it
-                        if (code) {
-                            console.log('✅ QR code detected:', code.data);
-
-                            // Check if it's a URL or just a peer ID
-                            if (code.data.includes('mode=viewer&peer=')) {
-                                // Extract peer ID from URL
-                                const url = new URL(code.data);
-                                const peerId = url.searchParams.get('peer');
-                                console.log('Extracted peer ID from URL:', peerId);
-                                app.connectToPeer(peerId);
-                            } else {
-                                // Assume it's just a peer ID
-                                app.connectToPeer(code.data);
-                            }
-                        }
-                    }
-                }
-            }, 100);  // Check every 100ms
-        }, 500);  // Wait 500ms for video to start
-
-    } catch (error) {
-        console.error('QR scanner error:', error);
-
-        if (error.name === 'NotAllowedError') {
-            app.showStatus('viewerStatus', 'Camera access denied. Please grant permissions and try again.', 'error');
-        } else {
-            app.showStatus('viewerStatus', `Scanner error: ${error.message}`, 'error');
-        }
-    }
-};
-
-/**
- * Toggle QR scanner visibility
- */
-app.toggleQRScanner = function() {
-    const scannerContainer = document.getElementById('scannerContainer');
-    const manualContainer = document.getElementById('manualEntryContainer');
-
-    if (scannerContainer.classList.contains('hidden')) {
-        // Show scanner, hide manual entry
-        scannerContainer.classList.remove('hidden');
-        manualContainer.classList.add('hidden');
-        app.showStatus('viewerStatus', 'Point camera at QR code', 'info');
-        app.startQRScanner();
-    } else {
-        // Hide scanner, show manual entry
-        scannerContainer.classList.add('hidden');
-        manualContainer.classList.remove('hidden');
-        app.showStatus('viewerStatus', 'Ready to connect', 'success');
-        app.stopQRScanner();
-    }
-};
-
-/**
- * Stop QR scanner and release camera
- */
-app.stopQRScanner = function() {
-    // Stop scanner interval
-    if (app.scannerInterval) {
-        clearInterval(app.scannerInterval);
-        app.scannerInterval = null;
-    }
-
-    // Stop scanner stream
-    if (app.scannerStream) {
-        app.scannerStream.getTracks().forEach(track => track.stop());
-        app.scannerStream = null;
-    }
-
-    // Clear video element
-    const scannerVideo = document.getElementById('qrScanner');
-    if (scannerVideo) {
-        scannerVideo.srcObject = null;
-    }
-
-    // Hide scanner camera switch button
-    const switchBtn = document.getElementById('switchScannerCameraBtn');
-    if (switchBtn) {
-        switchBtn.style.display = 'none';
-    }
-
-    console.log('QR scanner stopped');
-};
-
-/**
  * Connect manually using peer ID from text input
  */
 app.connectManually = function() {
@@ -1046,11 +795,7 @@ app.connectManually = function() {
 app.connectToPeer = function(remotePeerId) {
     console.log('Connecting to peer:', remotePeerId);
 
-    // Stop QR scanner if it's running
-    app.stopQRScanner();
-
-    // Hide both input containers
-    app.elements.scannerContainer.classList.add('hidden');
+    // Hide input container
     document.getElementById('manualEntryContainer').classList.add('hidden');
 
     app.showStatus('viewerStatus', `Connecting to camera (${remotePeerId})...`, 'info');
@@ -1429,9 +1174,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Log library loading status
     console.log('Library status:', {
-        Peer: typeof Peer !== 'undefined',
-        QRCode: typeof QRCode !== 'undefined',
-        jsQR: typeof jsQR !== 'undefined'
+        Peer: typeof Peer !== 'undefined'
     });
 
     // Check if URL has auto-mode parameters

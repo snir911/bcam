@@ -48,21 +48,10 @@
 
             <video id="localVideo" autoplay muted playsinline></video>
 
-            <div id="qrContainer" class="qr-container hidden">
-                <h3>Scan to connect</h3>
-                <div id="qrcode">
-                    <p style="padding: 20px; color: #666;">Generating QR code...</p>
-                </div>
-                <p class="peer-id" style="margin-top: 15px;">
-                    <strong style="font-size: 32px; color: #667eea; font-family: monospace; letter-spacing: 4px;">
-                        <span id="peerId">----</span>
-                    </strong>
-                </p>
-                <p style="font-size: 13px; color: #666; margin-top: 5px;">
-                    Enter this code on viewer device
-                </p>
-                <p style="font-size: 11px; color: #999; margin-top: 10px;">
-                    📱 Or scan QR code for instant connection
+            <div id="codeDisplay" class="hidden" style="margin: 30px 0; padding: 30px; background: #f8f9fa; border-radius: 12px; text-align: center;">
+                <p style="font-size: 16px; color: #666; margin-bottom: 15px;">Enter this code on viewer device:</p>
+                <p style="font-size: 64px; color: #667eea; font-family: monospace; letter-spacing: 12px; font-weight: bold; margin: 20px 0;">
+                    <span id="peerId">------</span>
                 </p>
             </div>
 
@@ -74,37 +63,16 @@
             <h1>👀 Viewer Mode</h1>
             <div id="viewerStatus" class="status info">Ready to connect</div>
 
-            <!-- Manual Code Entry (Default) -->
+            <!-- Code Entry -->
             <div id="manualEntryContainer">
-                <div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 12px;">
-                    <p style="font-size: 16px; margin-bottom: 15px;"><strong>Enter 6-digit code:</strong></p>
+                <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border-radius: 12px;">
+                    <p style="font-size: 18px; margin-bottom: 20px; text-align: center;"><strong>Enter 6-digit code from camera:</strong></p>
                     <input type="text" id="manualPeerId" placeholder="123456" maxlength="6" pattern="[0-9]{6}"
-                           style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 28px; text-align: center; letter-spacing: 10px;">
-                    <button onclick="app.connectManually()" style="margin-top: 15px; width: 100%;">
+                           style="width: 100%; padding: 20px; border: 2px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 32px; text-align: center; letter-spacing: 12px;">
+                    <button onclick="app.connectManually()" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 16px;">
                         📡 Connect
                     </button>
                 </div>
-
-                <div style="text-align: center; margin: 20px 0; color: #999;">
-                    <span style="font-size: 14px;">── OR ──</span>
-                </div>
-
-                <button onclick="app.toggleQRScanner()" style="width: 100%; background: #6c757d;">
-                    📷 Scan QR Code
-                </button>
-            </div>
-
-            <!-- QR Scanner (Hidden by default) -->
-            <div id="scannerContainer" class="hidden">
-                <button id="switchScannerCameraBtn" onclick="app.switchScannerCamera()"
-                        style="margin-bottom: 10px; padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; display: none;">
-                    🔄 Switch Camera
-                </button>
-                <video id="qrScanner" playsinline></video>
-                <p class="scanner-instruction">Point your camera at the QR code</p>
-                <button onclick="app.toggleQRScanner()" class="secondary" style="margin-top: 15px;">
-                    ⌨️ Enter Code Instead
-                </button>
             </div>
 
             <!-- Remote Video -->
@@ -132,8 +100,6 @@
 
     <!-- External Libraries -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
 
     <!-- Main Application -->
     <script src="app.js"></script>
