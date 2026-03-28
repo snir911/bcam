@@ -1,4 +1,6 @@
-# 👶 Baby Monitor - WebRTC Streaming
+# Cradle - Smart Baby Monitoring
+
+**Peace of mind, anywhere**
 
 A secure, peer-to-peer baby monitor web application that works entirely in your browser. No servers, no cloud storage, no subscription - just direct video streaming between your devices.
 

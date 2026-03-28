@@ -3,24 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Baby Monitor - WebRTC</title>
+    <title>Cradle | Smart Baby Monitoring</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <!-- Mode Selection Screen -->
         <div id="modeSelection">
-            <h1>👶 Baby Monitor</h1>
-            <p class="subtitle">Secure Peer-to-Peer Video Streaming</p>
+            <div class="logo">
+                <span class="material-symbols-outlined">child_care</span>
+                <h1>Cradle</h1>
+            </div>
+            <h2 class="tagline">Peace of mind, anywhere</h2>
+            <p class="subtitle">Secure, private, and beautifully simple monitoring for your most precious moments</p>
 
             <div class="mode-selection">
-                <button onclick="app.startCameraMode()">
-                    📹 Camera Mode
+                <button onclick="app.startCameraMode()" class="mode-button camera">
+                    <span class="material-symbols-outlined">videocam</span>
+                    <span class="button-text">Camera Mode</span>
                     <div class="button-subtitle">Place with baby</div>
                 </button>
 
-                <button onclick="app.startViewerMode()">
-                    👀 Viewer Mode
+                <button onclick="app.startViewerMode()" class="mode-button viewer">
+                    <span class="material-symbols-outlined">visibility</span>
+                    <span class="button-text">Viewer Mode</span>
                     <div class="button-subtitle">Watch from another device</div>
                 </button>
             </div>
@@ -38,63 +46,90 @@
 
         <!-- Camera Mode Screen -->
         <div id="cameraMode" class="hidden">
-            <h1>📹 Camera Mode</h1>
+            <div class="screen-header">
+                <span class="material-symbols-outlined">child_care</span>
+                <h1>Cradle</h1>
+            </div>
+
             <div id="cameraStatus" class="status info">Initializing camera...</div>
 
-            <button id="switchCameraBtn" onclick="app.switchCamera()"
-                    style="margin: 10px 0; padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; display: none;">
-                🔄 Switch Camera
+            <div class="video-wrapper">
+                <video id="localVideo" autoplay muted playsinline></video>
+                <div class="live-badge">
+                    <span class="live-dot"></span>
+                    LIVE
+                </div>
+            </div>
+
+            <button id="switchCameraBtn" onclick="app.switchCamera()" class="control-button">
+                <span class="material-symbols-outlined">sync</span>
+                Switch Camera
             </button>
 
-            <video id="localVideo" autoplay muted playsinline></video>
-
-            <div id="codeDisplay" class="hidden" style="margin: 30px 0; padding: 30px; background: #f8f9fa; border-radius: 12px; text-align: center;">
-                <p style="font-size: 16px; color: #666; margin-bottom: 15px;">Enter this code on viewer device:</p>
-                <p style="font-size: 64px; color: #667eea; font-family: monospace; letter-spacing: 12px; font-weight: bold; margin: 20px 0;">
+            <div id="codeDisplay" class="hidden code-card">
+                <h3>Secure Monitor Code</h3>
+                <p class="code-instruction">Enter this code on viewer device:</p>
+                <p class="peer-code">
                     <span id="peerId">------</span>
                 </p>
             </div>
 
-            <button class="secondary" onclick="app.resetApp()">← Back to Menu</button>
+            <button class="secondary" onclick="app.resetApp()">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Back to Menu
+            </button>
         </div>
 
         <!-- Viewer Mode Screen -->
         <div id="viewerMode" class="hidden">
-            <h1>👀 Viewer Mode</h1>
+            <div class="screen-header">
+                <span class="material-symbols-outlined">child_care</span>
+                <h1>Cradle</h1>
+            </div>
+
             <div id="viewerStatus" class="status info">Ready to connect</div>
 
             <!-- Code Entry -->
             <div id="manualEntryContainer">
-                <div style="margin: 20px 0; padding: 30px; background: #f8f9fa; border-radius: 12px;">
-                    <p style="font-size: 18px; margin-bottom: 20px; text-align: center;"><strong>Enter 6-digit code from camera:</strong></p>
-                    <input type="text" id="manualPeerId" placeholder="123456" maxlength="6" pattern="[0-9]{6}"
-                           style="width: 100%; padding: 20px; border: 2px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 32px; text-align: center; letter-spacing: 12px;">
-                    <button onclick="app.connectManually()" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 16px;">
-                        📡 Connect
+                <div class="connect-card">
+                    <h3>Connect New Viewer</h3>
+                    <p class="connect-instruction">Enter the 6-digit synchronization code displayed on your primary device to start monitoring.</p>
+                    <input type="text" id="manualPeerId" placeholder="000000" maxlength="6" pattern="[0-9]{6}" class="code-input">
+                    <button onclick="app.connectManually()" class="verify-button">
+                        <span class="material-symbols-outlined">verified</span>
+                        Verify Code
                     </button>
+                    <div class="security-notice">
+                        <span class="material-symbols-outlined">security</span>
+                        Codes are unique and expire in 10 minutes for your privacy and security.
+                    </div>
                 </div>
             </div>
 
             <!-- Remote Video -->
             <div id="remoteVideoContainer" class="hidden">
-                <video id="remoteVideo" autoplay playsinline controls muted></video>
-                <div id="connectionInfo" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 6px; text-align: center;">
-                    <p style="font-size: 14px; margin: 0; color: #667eea;">
-                        <span id="connectionType">🔗 Detecting connection type...</span>
-                    </p>
+                <div class="video-wrapper">
+                    <video id="remoteVideo" autoplay playsinline controls muted></video>
+                    <div class="live-badge">
+                        <span class="live-dot"></span>
+                        LIVE
+                    </div>
                 </div>
-                <p style="font-size: 12px; color: #666; margin-top: 10px;">
-                    <button onclick="const v = document.getElementById('remoteVideo'); v.muted = false; v.play();"
-                            style="padding: 8px 16px; font-size: 14px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                        🔊 Enable Sound & Play
-                    </button>
-                    <br><span style="font-size: 11px; color: #999; margin-top: 5px; display: inline-block;">
-                        Click to unmute and start playback (browsers block auto-play with sound)
-                    </span>
-                </p>
+                <div id="connectionInfo" class="connection-info">
+                    <span class="material-symbols-outlined">signal_cellular_alt</span>
+                    <span id="connectionType">Detecting connection type...</span>
+                </div>
+                <button onclick="const v = document.getElementById('remoteVideo'); v.muted = false; v.play();" class="audio-control">
+                    <span class="material-symbols-outlined">volume_up</span>
+                    Enable Sound & Play
+                </button>
+                <p class="audio-notice">Click to unmute and start playback (browsers block auto-play with sound)</p>
             </div>
 
-            <button class="secondary" onclick="app.resetApp()">← Back to Menu</button>
+            <button class="secondary" onclick="app.resetApp()">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Back to Menu
+            </button>
         </div>
     </div>
 
