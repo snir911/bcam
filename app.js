@@ -34,6 +34,7 @@ const app = {
     availableCameras: [],    // List of available video devices
     currentCameraIndex: -1,  // Currently selected camera index (-1 = use facingMode)
     wakeLock: null,          // Screen wake lock (keep camera running)
+    mode: null,              // Current mode: 'camera' or 'viewer'
 
     // DOM element references
     elements: {
@@ -368,6 +369,9 @@ app.detectConnectionType = async function() {
 app.resetApp = function() {
     console.log('Resetting application...');
 
+    // Reset mode
+    app.mode = null;
+
     // Clean up peer connection
     if (app.peer) {
         app.peer.destroy();
@@ -435,6 +439,9 @@ app.resetApp = function() {
 app.startCameraMode = async function() {
     console.log('Starting camera mode...');
 
+    // Set mode
+    app.mode = 'camera';
+
     // Hide mode selection and show camera mode
     app.elements.modeSelection.classList.add('hidden');
     app.elements.cameraMode.classList.remove('hidden');
@@ -459,7 +466,7 @@ app.startCameraMode = async function() {
         // Show camera switch button if multiple cameras available
         const switchBtn = document.getElementById('switchCameraBtn');
         if (switchBtn && app.availableCameras.length > 1) {
-            switchBtn.style.display = 'block';
+            switchBtn.style.display = 'flex';
             console.log(`📷 Camera switcher enabled (${app.availableCameras.length} cameras available)`);
         }
 
@@ -706,6 +713,9 @@ app.startCameraMode = async function() {
  */
 app.startViewerMode = async function(autoConnect = false) {
     console.log('Starting viewer mode...', autoConnect ? '(auto-connect)' : '');
+
+    // Set mode
+    app.mode = 'viewer';
 
     // Hide mode selection and show viewer mode
     app.elements.modeSelection.classList.add('hidden');
@@ -1257,5 +1267,5 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
-console.log('Baby Monitor initialized. Select a mode to begin.');
-console.log('Version: 1.3.0 - Connection type detection, camera switcher & 6-digit codes');
+console.log('Cradle Baby Monitor initialized. Select a mode to begin.');
+console.log('Version: 2.0.0 - Stitch design implementation with Plus Jakarta Sans & Material Symbols');

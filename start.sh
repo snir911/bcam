@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 PORT=8000
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}   👶 Baby Monitor Server${NC}"
+echo -e "${BLUE}   Cradle Baby Monitor Server${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
