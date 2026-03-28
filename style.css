@@ -153,13 +153,18 @@ button {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    gap: 4px;
+}
+
+.button-title {
+    font-size: 18px;
+    font-weight: 600;
 }
 
 .button-subtitle {
     font-size: 13px;
     font-weight: 400;
     opacity: 0.9;
-    margin-top: 4px;
 }
 
 .control-button {
@@ -582,12 +587,19 @@ video {
     }
 
     .mode-button {
-        font-size: 16px;
-        padding: 20px 28px;
+        padding: 20px 24px;
     }
 
     .mode-button .material-symbols-outlined {
         font-size: 24px;
+    }
+
+    .button-title {
+        font-size: 16px;
+    }
+
+    .button-subtitle {
+        font-size: 12px;
     }
 
     .peer-code {
