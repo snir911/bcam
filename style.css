@@ -130,8 +130,8 @@ button {
     font-weight: 600;
     width: 100%;
     display: flex;
-    align-items: flex-start;
-    justify-content: center;
+    align-items: center;
+    justify-content: flex-start;
     gap: 12px;
     box-shadow: 0 4px 16px rgba(48, 84, 188, 0.3);
 }
@@ -139,7 +139,6 @@ button {
 .mode-button .material-symbols-outlined {
     font-size: 28px;
     flex-shrink: 0;
-    margin-top: 2px;
 }
 
 .mode-button:hover {
